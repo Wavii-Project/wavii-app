@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -40,6 +41,7 @@ import {
 import { WaviiButton } from '../../components/common/WaviiButton';
 import { WaviiInput } from '../../components/common/WaviiInput';
 import { BorderRadius, Colors, FontFamily, FontSize, Spacing } from '../../theme';
+import { hasScholarAccess } from '../../utils/subscription';
 
 type Route = RouteProp<AppStackParamList, 'ManageClasses'>;
 
@@ -92,7 +94,7 @@ export const ManageClassesScreen = () => {
   const { user, token } = useAuth();
   const { colors } = useTheme();
   const { showAlert } = useAlert();
-  const hasScholarAccess = user?.subscription?.toLowerCase() === 'education';
+  const scholarAccess = hasScholarAccess(user?.subscription);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ClassManageResponse | null>(null);
   const [teacherBulletin, setTeacherBulletin] = useState<BulletinTeacher | null>(null);
@@ -111,6 +113,8 @@ export const ManageClassesScreen = () => {
   const [postContent, setPostContent] = useState('');
   const [saving, setSaving] = useState(false);
   const [announcementSaving, setAnnouncementSaving] = useState(false);
+  const [agendaSearch, setAgendaSearch] = useState('');
+  const [agendaShowAll, setAgendaShowAll] = useState(false);
 
   const [instrument, setInstrument] = useState('');
   const [price, setPrice] = useState('');
@@ -134,7 +138,7 @@ export const ManageClassesScreen = () => {
   const [announcementError, setAnnouncementError] = useState<string | undefined>();
 
   const load = useCallback(async () => {
-    if (!token || !user || !hasScholarAccess) {
+    if (!token || !user || !scholarAccess) {
       setLoading(false);
       setData(null);
       return;
@@ -158,7 +162,7 @@ export const ManageClassesScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [hasScholarAccess, showAlert, token, user]);
+  }, [scholarAccess, showAlert, token, user]);
 
   useFocusEffect(
     useCallback(() => {
@@ -424,7 +428,7 @@ export const ManageClassesScreen = () => {
     setRejectReason('');
   };
 
-  const completeSession = async (session: ClassSession) => {
+  const doCompleteSession = async (session: ClassSession) => {
     if (!token) return;
     try {
       await apiUpdateClassSession(token, session.id, { status: 'completed' });
@@ -435,6 +439,17 @@ export const ManageClassesScreen = () => {
         message: err?.response?.data?.message ?? 'No se pudo completar la sesión.',
       });
     }
+  };
+
+  const completeSession = (session: ClassSession) => {
+    showAlert({
+      title: 'Marcar como completada',
+      message: '¿Seguro que quieres marcar esta sesión como completada? Esta acción no se puede deshacer.',
+      buttons: [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Confirmar', style: 'destructive', delaySeconds: 5, onPress: () => doCompleteSession(session) },
+      ],
+    });
   };
 
   const publishPost = async () => {
@@ -574,7 +589,7 @@ export const ManageClassesScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {!hasScholarAccess ? (
+      {!scholarAccess ? (
         <View style={styles.gateWrap}>
           <View style={[styles.gateCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={[styles.gateIcon, { backgroundColor: Colors.educationTier + '20' }]}>
@@ -742,7 +757,7 @@ export const ManageClassesScreen = () => {
                   <View>
                     <Text style={[styles.cardTitle, { color: colors.text }]}>{item.studentName}</Text>
                     <Text style={[styles.cardMeta, { color: colors.textSecondary }]}>
-                      {item.instrument ?? 'Clase'} · {item.requestedModality ?? item.modality ?? 'Sin modalidad'}
+                      {[item.instrument, (item.requestedModality || item.modality)?.charAt(0).toUpperCase() + (item.requestedModality || item.modality)?.slice(1).toLowerCase()].filter(Boolean).join(' · ')}
                     </Text>
                   </View>
                   <View style={[styles.statusChip, { backgroundColor: colors.background }]}>
@@ -787,7 +802,11 @@ export const ManageClassesScreen = () => {
                   <View>
                     <Text style={[styles.cardTitle, { color: colors.text }]}>{item.studentName}</Text>
                     <Text style={[styles.cardMeta, { color: colors.textSecondary }]}>
-                      {item.instrument ?? 'Clase'} · {item.requestedModality ?? item.modality ?? 'Sin modalidad'} · {item.city || 'Sin ciudad'}
+                      {[
+                        item.instrument,
+                        (item.requestedModality || item.modality)?.replace(/\w+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()),
+                        item.city,
+                      ].filter(Boolean).join(' · ') || 'Sin información'}
                     </Text>
                   </View>
                   <View style={[styles.statusChip, { backgroundColor: colors.background }]}>
@@ -819,38 +838,67 @@ export const ManageClassesScreen = () => {
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Aún no tienes alumnos aceptados.</Text>
           )}
 
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Agenda</Text>
-          {data?.sessions?.length ? (
-            data.sessions.map((session) => (
-              <View
-                key={session.id}
-                style={[
-                  styles.card,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
-              >
-                <Text style={[styles.cardTitle, { color: colors.text }]}>
-                  {session.studentName}
-                </Text>
-                <Text style={[styles.cardMeta, { color: colors.textSecondary }]}>
-                  {session.scheduledAt.replace('T', ' ').slice(0, 16)} ·{' '}
-                  {session.durationMinutes} min · {session.status}
-                </Text>
-                {session.meetingUrl ? (
-                  <Text style={[styles.linkText, { color: Colors.primary }]}>
-                    {session.meetingUrl}
-                  </Text>
-                ) : null}
-                {session.status !== 'completed' ? (
-                  <View style={styles.cardActions}>
-                    <WaviiButton
-                      title="Marcar completada"
-                      onPress={() => completeSession(session)}
-                    />
-                  </View>
+          <View style={styles.sectionHeadRow}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Agenda</Text>
+            {(data?.sessions?.length ?? 0) > 3 && !agendaShowAll ? (
+              <TouchableOpacity onPress={() => setAgendaShowAll(true)}>
+                <Text style={[styles.sectionLink, { color: Colors.primary }]}>Ver todas</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+          {(data?.sessions?.length ?? 0) > 0 ? (
+            <>
+              <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Ionicons name="search-outline" size={16} color={colors.textSecondary} />
+                <TextInput
+                  style={[styles.searchInput, { color: colors.text }]}
+                  placeholder="Buscar sesión..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={agendaSearch}
+                  onChangeText={setAgendaSearch}
+                />
+                {agendaSearch.length > 0 ? (
+                  <TouchableOpacity onPress={() => setAgendaSearch('')}>
+                    <Ionicons name="close-circle" size={16} color={colors.textSecondary} />
+                  </TouchableOpacity>
                 ) : null}
               </View>
-            ))
+              {(() => {
+                const sorted = [...(data?.sessions ?? [])].sort((a, b) => {
+                  if (a.status === 'completed' && b.status !== 'completed') return 1;
+                  if (a.status !== 'completed' && b.status === 'completed') return -1;
+                  return 0;
+                });
+                const filtered = agendaSearch.trim()
+                  ? sorted.filter((s) => s.studentName?.toLowerCase().includes(agendaSearch.trim().toLowerCase()))
+                  : sorted;
+                const visible = agendaShowAll ? filtered : filtered.slice(0, 3);
+                return visible.length ? visible.map((session) => (
+                  <View
+                    key={session.id}
+                    style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  >
+                    <Text style={[styles.cardTitle, { color: colors.text }]}>{session.studentName}</Text>
+                    <Text style={[styles.cardMeta, { color: colors.textSecondary }]}>
+                      {session.scheduledAt.replace('T', ' ').slice(0, 16)} ·{' '}
+                      {session.durationMinutes} min · {STATUS_LABELS[session.status] ?? session.status}
+                    </Text>
+                    {session.meetingUrl ? (
+                      <Text style={[styles.linkText, { color: Colors.primary }]}>{session.meetingUrl}</Text>
+                    ) : null}
+                    {session.status !== 'completed' ? (
+                      <View style={styles.cardActions}>
+                        <WaviiButton title="Marcar completada" size="sm" onPress={() => completeSession(session)} />
+                      </View>
+                    ) : null}
+                  </View>
+                )) : (
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                    No hay sesiones que coincidan con la búsqueda.
+                  </Text>
+                );
+              })()}
+            </>
           ) : (
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
               Aún no hay sesiones agendadas.
@@ -1375,7 +1423,6 @@ const SelectionModal = ({
               <Text style={[styles.dropdownOptionText, { color: selected === option ? Colors.primary : colors.text }]}>
                 {option}
               </Text>
-              {selected === option ? <Ionicons name="checkmark" size={20} color={Colors.primary} /> : null}
             </TouchableOpacity>
           ))}
         </View>
@@ -1490,6 +1537,21 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.bold,
     fontSize: FontSize.xs,
   },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.sm,
+    minHeight: 38,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    paddingVertical: 0,
+  },
   announcementCard: {
     borderWidth: 1,
     borderRadius: BorderRadius.xl,
@@ -1551,7 +1613,7 @@ const styles = StyleSheet.create({
   },
   cardHead: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: Spacing.sm,
   },
@@ -1925,4 +1987,3 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
 });
-

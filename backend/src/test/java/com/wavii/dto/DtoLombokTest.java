@@ -5,7 +5,6 @@ import com.wavii.dto.onboarding.CompleteOnboardingRequest;
 import com.wavii.dto.onboarding.VerificationStatusResponse;
 import com.wavii.model.enums.Level;
 import com.wavii.model.enums.Role;
-import com.wavii.model.enums.Subscription;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -29,10 +28,10 @@ class DtoLombokTest {
     void authResponseEqualsEqualObjectsTest() {
         UUID id = UUID.randomUUID();
         AuthResponse r1 = AuthResponse.builder().userId(id).email("a@b.com").accessToken("tok")
-                .refreshToken("ref").name("Ana").role(Role.USUARIO).subscription(Subscription.FREE)
+                .refreshToken("ref").name("Ana").role(Role.USUARIO).subscription("free")
                 .emailVerified(true).onboardingCompleted(false).teacherVerified(false).build();
         AuthResponse r2 = AuthResponse.builder().userId(id).email("a@b.com").accessToken("tok")
-                .refreshToken("ref").name("Ana").role(Role.USUARIO).subscription(Subscription.FREE)
+                .refreshToken("ref").name("Ana").role(Role.USUARIO).subscription("free")
                 .emailVerified(true).onboardingCompleted(false).teacherVerified(false).build();
         assertEquals(r1, r2);
         assertEquals(r1.hashCode(), r2.hashCode());

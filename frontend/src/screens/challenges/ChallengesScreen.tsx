@@ -117,7 +117,7 @@ export const ChallengesScreen = () => {
       message: '¿Seguro que quieres marcar este desafío como hecho?',
       buttons: [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Confirmar', style: 'destructive', delaySeconds: 10, onPress: () => handleComplete(challengeId) },
+        { text: 'Confirmar', style: 'destructive', delaySeconds: 5, onPress: () => handleComplete(challengeId) },
       ],
     });
   };

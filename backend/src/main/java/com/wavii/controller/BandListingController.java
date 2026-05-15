@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -29,7 +30,7 @@ import java.util.UUID;
  * @author danielrguezh
  */
 @RestController
-@RequestMapping("/api/band-listings")
+@RequestMapping({ "/api/band-listings", "/api/bands" })
 @RequiredArgsConstructor
 @Slf4j
 public class BandListingController {
@@ -120,6 +121,7 @@ public class BandListingController {
             Path uploadPath = uploadRoot().resolve("bands");
             Files.createDirectories(uploadPath);
             String storedName = UUID.randomUUID() + extensionOf(file.getOriginalFilename());
+            log.info("Subiendo imagen de banda: contentType={}, size={} bytes", contentType, file.getSize());
             Files.copy(file.getInputStream(), uploadPath.resolve(storedName), StandardCopyOption.REPLACE_EXISTING);
             return ResponseEntity.ok(Map.of(
                     "url", appBaseUrl + "/uploads/bands/" + storedName,
@@ -145,6 +147,14 @@ public class BandListingController {
     ) {
         service.delete(id, currentUser);
         return ResponseEntity.noContent().build();
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<Map<String, String>> handleMultipartException(MultipartException ex) {
+        log.warn("No se pudo procesar la subida de imagen de banda: {}", ex.getMessage());
+        return ResponseEntity.badRequest().body(Map.of(
+                "message", "No se pudo leer la imagen. Prueba con otra foto o vuelve a intentarlo."
+        ));
     }
 
     /**

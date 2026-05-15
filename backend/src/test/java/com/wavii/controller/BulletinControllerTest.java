@@ -45,7 +45,7 @@ class BulletinControllerTest {
         teacher.setId(UUID.randomUUID());
         teacher.setName("Prof. Ana");
         teacher.setRole(Role.PROFESOR_CERTIFICADO);
-        teacher.setSubscription(Subscription.EDUCATION);
+        teacher.setSubscription(Subscription.SCHOLAR);
         teacher.setBio("Profesora de piano");
         teacher.setInstrument("Piano");
         teacher.setPricePerHour(new BigDecimal("30.00"));
@@ -61,7 +61,7 @@ class BulletinControllerTest {
         teacher2.setId(UUID.randomUUID());
         teacher2.setName("Prof. Juan");
         teacher2.setRole(Role.PROFESOR_PARTICULAR);
-        teacher2.setSubscription(Subscription.EDUCATION);
+        teacher2.setSubscription(Subscription.SCHOLAR);
         teacher2.setBio("Profesor de guitarra");
         teacher2.setInstrument("Guitarra");
         teacher2.setPricePerHour(new BigDecimal("25.00"));
@@ -761,7 +761,7 @@ class BulletinControllerTest {
         student.setId(UUID.randomUUID());
         student.setName("Student A");
         student.setRole(Role.USUARIO);
-        student.setSubscription(Subscription.EDUCATION);
+        student.setSubscription(Subscription.SCHOLAR);
 
         BulletinUpdateRequest request = new BulletinUpdateRequest(
                 "Piano",

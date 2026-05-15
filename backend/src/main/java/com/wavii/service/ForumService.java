@@ -6,6 +6,7 @@ import com.wavii.dto.forum.ForumMemberResponse;
 import com.wavii.dto.forum.ForumResponse;
 import com.wavii.dto.forum.ForumSummaryResponse;
 import com.wavii.dto.forum.PostResponse;
+import com.wavii.dto.forum.UpdateForumRequest;
 import com.wavii.model.Forum;
 import com.wavii.model.ForumLike;
 import com.wavii.model.ForumMembership;
@@ -162,9 +163,36 @@ public class ForumService {
         return toResponse(forum, true, false, creator);
     }
 
+    @Transactional
+    public ForumResponse updateForum(UUID forumId, UpdateForumRequest request, User currentUser) {
+        Forum forum = forumRepository.findById(forumId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Foro no encontrado"));
+
+        ForumMembership membership = membershipRepository.findByForumAndUser(forum, currentUser)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "No tienes acceso a este foro"));
+
+        if (membership.getRole() != ForumMembershipRole.OWNER && membership.getRole() != ForumMembershipRole.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Solo los administradores pueden editar el grupo");
+        }
+
+        if (request.description() != null) {
+            forum.setDescription(request.description().trim().isEmpty() ? null : request.description().trim());
+        }
+        if (request.coverImageUrl() != null) {
+            forum.setCoverImageUrl(request.coverImageUrl());
+        }
+        if (request.category() != null) {
+            forum.setCategory(request.category());
+        }
+
+        forum = forumRepository.save(forum);
+        boolean liked = likeRepository.existsByForumAndUser(forum, currentUser);
+        return toResponse(forum, true, liked, currentUser);
+    }
+
     /**
      * Une al usuario actual a un foro.
-     * 
+     *
      * @param forumId ID del foro.
      * @param user Usuario actual.
      */

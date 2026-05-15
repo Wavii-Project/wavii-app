@@ -179,7 +179,7 @@ class SubscriptionControllerTest {
                 new SubscriptionController.ConfirmSubscriptionRequest("scholar", "seti_123"), principal);
 
         assertEquals(HttpStatus.OK, result.getStatusCode());
-        assertEquals(Subscription.EDUCATION, user.getSubscription());
+        assertEquals(Subscription.SCHOLAR, user.getSubscription());
         assertEquals("active", user.getSubscriptionStatus());
         assertTrue(user.getStripeSubscriptionId().startsWith("dev_sub_"));
     }
@@ -239,7 +239,7 @@ class SubscriptionControllerTest {
                 new SubscriptionController.ConfirmSubscriptionRequest("scholar", "seti_123"), principal);
 
         assertEquals(HttpStatus.OK, result.getStatusCode());
-        assertEquals(Subscription.EDUCATION, user.getSubscription());
+        assertEquals(Subscription.SCHOLAR, user.getSubscription());
         assertEquals("active", user.getSubscriptionStatus());
     }
 
@@ -327,7 +327,7 @@ class SubscriptionControllerTest {
                 new SubscriptionController.StartSubscriptionRequest("scholar", "pm_123"), principal);
 
         assertEquals(HttpStatus.OK, result.getStatusCode());
-        assertEquals(Subscription.EDUCATION, user.getSubscription());
+        assertEquals(Subscription.SCHOLAR, user.getSubscription());
     }
 
     @Test
@@ -385,7 +385,7 @@ class SubscriptionControllerTest {
                 new SubscriptionController.StartSubscriptionRequest("scholar", "pm_123"), principal);
 
         assertEquals(HttpStatus.OK, result.getStatusCode());
-        assertEquals(Subscription.EDUCATION, user.getSubscription());
+        assertEquals(Subscription.SCHOLAR, user.getSubscription());
     }
 
     @Test
@@ -775,7 +775,7 @@ class SubscriptionControllerTest {
                 new SubscriptionController.ChangeSubscriptionRequest("scholar"), principal);
 
         assertEquals(HttpStatus.OK, result.getStatusCode());
-        assertEquals(Subscription.EDUCATION, user.getSubscription());
+        assertEquals(Subscription.SCHOLAR, user.getSubscription());
         assertEquals("active", user.getSubscriptionStatus());
         assertFalse(user.isSubscriptionCancelAtPeriodEnd());
     }
@@ -841,7 +841,7 @@ class SubscriptionControllerTest {
                 new SubscriptionController.ChangeSubscriptionRequest("scholar"), principal);
 
         assertEquals(HttpStatus.OK, result.getStatusCode());
-        assertEquals(Subscription.EDUCATION, user.getSubscription());
+        assertEquals(Subscription.SCHOLAR, user.getSubscription());
     }
 
     @Test
@@ -1019,7 +1019,7 @@ class SubscriptionControllerTest {
 
     @Test
     void getStatusEducationSubscriptionReturnsLowercaseTest() {
-        user.setSubscription(Subscription.EDUCATION);
+        user.setSubscription(Subscription.SCHOLAR);
 
         ResponseEntity<?> result = subscriptionController.getStatus(principal);
 

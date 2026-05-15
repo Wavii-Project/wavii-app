@@ -349,7 +349,9 @@ public class ClassService {
                 .sender(sender)
                 .content(cleaned)
                 .build();
-        return toMessageMap(messageRepository.save(message));
+        ClassMessage saved = messageRepository.save(message);
+        notifyTeacherAboutStudentMessage(enrollment, sender, cleaned);
+        return toMessageMap(saved);
     }
 
     /**
@@ -865,6 +867,38 @@ public class ClassService {
                     body
             );
         }
+    }
+
+    private void notifyTeacherAboutStudentMessage(ClassEnrollment enrollment, User sender, String content) {
+        if (enrollment == null || sender == null || enrollment.getStudent() == null || enrollment.getTeacher() == null) {
+            return;
+        }
+        if (!enrollment.getStudent().getId().equals(sender.getId())) {
+            return;
+        }
+
+        User teacher = enrollment.getTeacher();
+        String preview = content.length() > 140 ? content.substring(0, 140) + "..." : content;
+        String title = "Nuevo mensaje del alumno";
+        String body = sender.getName() + " te ha enviado un mensaje: " + preview;
+
+        notificationService.create(
+                teacher,
+                "class_chat_message",
+                title,
+                body,
+                Map.of(
+                        "enrollmentId", enrollment.getId().toString(),
+                        "studentId", enrollment.getStudent().getId().toString(),
+                        "teacherId", teacher.getId().toString()
+                ));
+
+        emailService.sendClassNotificationEmail(
+                teacher.getEmail(),
+                teacher.getName(),
+                title,
+                body
+        );
     }
 
     private boolean isAllowedStatus(String status) {

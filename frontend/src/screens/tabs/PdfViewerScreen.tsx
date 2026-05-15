@@ -20,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
 import { Colors, FontFamily, FontSize, Spacing, BorderRadius } from '../../theme';
 import { AppStackParamList } from '../../navigation/AppNavigator';
+import { normalizeSubscription } from '../../utils/subscription';
 import {
   PdfDocument,
   apiFetchPdfById,
@@ -73,6 +74,10 @@ try {
 
 async function fetchPdfAsBase64(uri: string): Promise<string> {
   const res = await http.get<ArrayBuffer>(uri, { responseType: 'arraybuffer' });
+  const contentType = String(res.headers?.['content-type'] ?? '').toLowerCase();
+  if (!contentType.includes('application/pdf')) {
+    throw new Error('NOT_PDF_RESPONSE');
+  }
   const bytes = new Uint8Array(res.data);
   const chunkSize = 8192;
   const chunks: string[] = [];
@@ -202,8 +207,8 @@ export const PdfViewerScreen = () => {
   };
 
   const handleDownload = async () => {
-    const subscription = String(user?.subscription ?? '').toLowerCase();
-    if (!subscription || subscription === 'free') {
+    const subscription = normalizeSubscription(user?.subscription);
+    if (subscription === 'free') {
       setPaywallVisible(true);
       return;
     }

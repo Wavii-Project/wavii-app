@@ -1,6 +1,7 @@
 package com.wavii.config;
 
 import com.wavii.service.ClassChatWebSocketHandler;
+import com.wavii.service.DirectMessageWebSocketHandler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -24,6 +25,9 @@ class WebSocketConfigTest {
     @Mock
     private com.wavii.service.ForumChatWebSocketHandler forumChatWebSocketHandler;
 
+    @Mock
+    private DirectMessageWebSocketHandler directMessageWebSocketHandler;
+
     @InjectMocks
     private WebSocketConfig webSocketConfig;
 
@@ -40,7 +44,8 @@ class WebSocketConfigTest {
 
         verify(registry).addHandler(classChatWebSocketHandler, "/ws/classes");
         verify(registry).addHandler(forumChatWebSocketHandler, "/ws/forums");
-        verify(registration, times(2)).setAllowedOriginPatterns("*");
+        verify(registry).addHandler(directMessageWebSocketHandler, "/ws/direct");
+        verify(registration, times(3)).setAllowedOriginPatterns("*");
     }
 
     @Test
@@ -53,7 +58,7 @@ class WebSocketConfigTest {
 
         webSocketConfig.registerWebSocketHandlers(registry);
 
-        verify(registration, times(2)).setAllowedOriginPatterns("*");
+        verify(registration, times(3)).setAllowedOriginPatterns("*");
     }
 
     @Test

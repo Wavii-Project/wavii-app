@@ -88,8 +88,8 @@ const ROLE_ICONS: Record<MusicianRole, React.ComponentProps<typeof Ionicons>['na
 };
 
 const TYPE_COLOR: Record<string, string> = {
-  BANDA_BUSCA_MUSICOS: '#8B5CF6',
-  MUSICO_BUSCA_BANDA: '#3B82F6',
+  BANDA_BUSCA_MUSICOS: Colors.accentPurple,
+  MUSICO_BUSCA_BANDA: Colors.accentBlue,
 };
 
 const TYPE_LABEL: Record<string, string> = {
@@ -107,7 +107,15 @@ function timeAgo(iso: string): string {
   return `Hace ${days} dias`;
 }
 
-function BandCard({ item, onPress }: { item: BandListing; onPress: () => void }) {
+function BandCard({
+  item,
+  onPress,
+  onPressCreator,
+}: {
+  item: BandListing;
+  onPress: () => void;
+  onPressCreator: () => void;
+}) {
   const { colors } = useTheme();
   const typeColor = TYPE_COLOR[item.type] ?? Colors.primary;
 
@@ -157,7 +165,16 @@ function BandCard({ item, onPress }: { item: BandListing; onPress: () => void })
         ) : null}
       </ScrollView>
 
-      <Text style={[styles.cardCreator, { color: colors.textSecondary }]}>por {item.creatorName}</Text>
+      <Pressable
+        onPress={(e) => {
+          e.stopPropagation();
+          onPressCreator();
+        }}
+        hitSlop={8}
+        style={{ alignSelf: 'flex-start' }}
+      >
+        <Text style={[styles.cardCreator, { color: colors.textSecondary }]}>por {item.creatorName}</Text>
+      </Pressable>
     </Pressable>
   );
 }
@@ -176,6 +193,7 @@ export const BandsScreen = () => {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [detectedCity, setDetectedCity] = useState<string | null>(null);
   const [locLoading, setLocLoading] = useState(true);
   const [genreModalVisible, setGenreModalVisible] = useState(false);
@@ -196,6 +214,7 @@ export const BandsScreen = () => {
     ) => {
       if (nextPage === 0) setLoading(true);
       else setLoadingMore(true);
+      if (reset) setLoadError(false);
 
       try {
         const data = await apiGetBandListings(
@@ -213,6 +232,7 @@ export const BandsScreen = () => {
       } catch {
         if (reset) setListings([]);
         setHasMore(false);
+        setLoadError(true);
       } finally {
         setLoading(false);
         setLoadingMore(false);
@@ -396,10 +416,24 @@ export const BandsScreen = () => {
           onEndReachedThreshold={0.3}
           ListEmptyComponent={
             <View style={styles.center}>
-              <Ionicons name="musical-notes-outline" size={48} color={colors.textSecondary} />
+              <Ionicons
+                name={loadError ? 'alert-circle-outline' : 'musical-notes-outline'}
+                size={48}
+                color={colors.textSecondary}
+              />
               <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                No hay anuncios con esos filtros.{'\n'}Se el primero en publicar.
+                {loadError
+                  ? 'No se pudieron cargar los anuncios.\nComprueba tu conexion e intentalo de nuevo.'
+                  : 'No hay anuncios con esos filtros.\nSe el primero en publicar.'}
               </Text>
+              {loadError ? (
+                <Pressable
+                  style={[styles.retryBtn, { backgroundColor: Colors.primary }]}
+                  onPress={() => load(0, true, { city, genre, role })}
+                >
+                  <Text style={styles.retryBtnText}>Reintentar</Text>
+                </Pressable>
+              ) : null}
             </View>
           }
           ListFooterComponent={loadingMore ? <ActivityIndicator color={Colors.primary} style={styles.footerLoader} /> : null}
@@ -407,6 +441,7 @@ export const BandsScreen = () => {
             <BandCard
               item={item}
               onPress={() => navigation.navigate('BandDetail', { listingId: item.id })}
+              onPressCreator={() => navigation.navigate('UserProfile', { userId: item.creatorId })}
             />
           )}
         />
@@ -487,7 +522,6 @@ const SelectionModal = ({
                 <Text style={[styles.dropdownOptionText, { color: selected === option ? Colors.primary : colors.text }]}>
                   {option}
                 </Text>
-                {selected === option ? <Ionicons name="checkmark" size={20} color={Colors.primary} /> : null}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -529,7 +563,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginHorizontal: Spacing.base,
-    marginBottom: 6,
+    marginBottom: 8,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 9,
     borderRadius: 12,
@@ -545,7 +579,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.sm,
     paddingHorizontal: Spacing.base,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   dropdownBtn: {
     flexDirection: 'row',
@@ -584,6 +618,17 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   footerLoader: { margin: 12 },
+  retryBtn: {
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.sm,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  retryBtnText: {
+    color: Colors.white,
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.sm,
+  },
   card: {
     borderRadius: BorderRadius.xl,
     overflow: 'hidden',
@@ -591,7 +636,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     gap: 6,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: Colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
@@ -662,7 +707,7 @@ const styles = StyleSheet.create({
   },
   modalOverlayCenter: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: Colors.overlayDark34,
     justifyContent: 'center',
     alignItems: 'center',
   },

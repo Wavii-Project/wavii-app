@@ -44,13 +44,13 @@ const CATEGORY_LABELS: Record<ForumCategory, string> = {
 };
 
 const CATEGORY_COLORS: Record<ForumCategory, string> = {
-  FANDOM: '#8B5CF6',
-  COMUNIDAD_MUSICAL: '#3B82F6',
-  TEORIA: '#14B8A6',
+  FANDOM: Colors.accentPurple,
+  COMUNIDAD_MUSICAL: Colors.accentBlue,
+  TEORIA: Colors.accentTeal,
   INSTRUMENTOS: Colors.primary,
-  BANDAS: '#EC4899',
-  ARTISTAS: '#F59E0B',
-  GENERAL: '#6B7280',
+  BANDAS: Colors.accentPink,
+  ARTISTAS: Colors.warning,
+  GENERAL: Colors.freeTier,
 };
 
 const CATEGORY_ICONS: Record<ForumCategory, React.ComponentProps<typeof Ionicons>['name']> = {
@@ -149,7 +149,7 @@ function ForumCard({ forum, onPress, onJoin, onLike, joining }: ForumCardProps) 
         disabled={joining || forum.joined}
       >
         {joining ? (
-          <ActivityIndicator size={12} color={forum.joined ? Colors.primary : '#FFFFFF'} />
+          <ActivityIndicator size={12} color={forum.joined ? Colors.primary : Colors.white} />
         ) : (
           <Text style={[styles.joinButtonText, forum.joined && styles.joinButtonTextJoined]}>
             {forum.joined ? 'Unido' : 'Unirse'}
@@ -198,7 +198,7 @@ export const GroupsScreen = () => {
   const loadRequestIdRef = useRef(0);
 
   const loadForums = useCallback(
-    async (query?: string) => {
+    async (query?: string, options?: { showLoading?: boolean }) => {
       if (!token) {
         setLoading(false);
         setForumsError('Necesitas iniciar sesion para ver comunidades.');
@@ -206,7 +206,10 @@ export const GroupsScreen = () => {
       }
 
       const requestId = ++loadRequestIdRef.current;
-      setLoading(true);
+      const showLoading = options?.showLoading ?? true;
+      if (showLoading) {
+        setLoading(true);
+      }
       setForumsError(null);
 
       const [allForumsResult, joinedForumsResult] = await Promise.allSettled([
@@ -221,7 +224,9 @@ export const GroupsScreen = () => {
       if (allForumsResult.status === 'fulfilled') {
         setForums(allForumsResult.value);
       } else {
-        setForums([]);
+        if (showLoading) {
+          setForums([]);
+        }
         setForumsError('No se pudieron cargar las comunidades. Intentalo de nuevo.');
       }
 
@@ -231,7 +236,7 @@ export const GroupsScreen = () => {
         setMyForums([]);
       }
 
-      if (requestId === loadRequestIdRef.current) {
+      if (showLoading && requestId === loadRequestIdRef.current) {
         setLoading(false);
       }
     },
@@ -240,7 +245,11 @@ export const GroupsScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      void loadForums(searchRef.current || undefined);
+      void loadForums(searchRef.current || undefined, { showLoading: true });
+      const interval = setInterval(() => {
+        void loadForums(searchRef.current || undefined, { showLoading: false });
+      }, 20000);
+      return () => clearInterval(interval);
     }, [loadForums]),
   );
 
@@ -257,7 +266,7 @@ export const GroupsScreen = () => {
       clearTimeout(searchTimer.current);
     }
     searchTimer.current = setTimeout(() => {
-      loadForums(text);
+      loadForums(text, { showLoading: true });
     }, 400);
   };
 
@@ -350,6 +359,7 @@ export const GroupsScreen = () => {
             <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
           </Pressable>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+            <View style={{ width: Spacing.base }} />
             {myForums.map((forum) => (
               <MyForumChip
                 key={forum.id}
@@ -357,6 +367,7 @@ export const GroupsScreen = () => {
                 onPress={() => navigation.navigate('ForumDetail', { forumId: forum.id })}
               />
             ))}
+            <View style={{ width: Spacing.base }} />
           </ScrollView>
         </View>
       ) : null}
@@ -482,17 +493,19 @@ const SelectionModal = ({
       <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
         <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onStartShouldSetResponder={() => true}>
           <Text style={[styles.modalTitle, { color: colors.text }]}>{title}</Text>
-          {options.map((option) => (
-            <TouchableOpacity
-              key={option}
-              style={[styles.modalOption, option === selected && { backgroundColor: Colors.primaryOpacity10 }]}
-              onPress={() => onSelect(option)}
-            >
-              <Text style={[styles.modalOptionText, { color: option === selected ? Colors.primary : colors.text }]}>
-                {option}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+            {options.map((option) => (
+              <TouchableOpacity
+                key={option}
+                style={[styles.modalOption, option === selected && { backgroundColor: Colors.primaryOpacity10 }]}
+                onPress={() => onSelect(option)}
+              >
+                <Text style={[styles.modalOptionText, { color: option === selected ? Colors.primary : colors.text }]}>
+                  {option}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       </TouchableOpacity>
     </Modal>
@@ -566,8 +579,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   chipRow: {
-    paddingHorizontal: Spacing.base,
     gap: Spacing.sm,
+    alignItems: 'center',
   },
   chip: {
     flexDirection: 'row',
@@ -685,14 +698,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   joinButtonJoined: {
-    backgroundColor: 'transparent',
+    backgroundColor: Colors.transparent,
     borderWidth: 1,
     borderColor: Colors.primary,
   },
   joinButtonText: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.xs,
-    color: '#FFFFFF',
+    color: Colors.white,
   },
   joinButtonTextJoined: {
     color: Colors.primary,
@@ -741,7 +754,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.34)',
+    backgroundColor: Colors.overlayDark34,
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.xl,

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_wavii_teacher_verification_tree" model="ir.ui.view">
+        <field name="name">wavii.teacher.verification.tree</field>
+        <field name="model">wavii.teacher.verification</field>
+        <field name="arch" type="xml">
+            <tree string="Wavii Verifications">
+                <field name="created_at"/>
+                <field name="teacher_name"/>
+                <field name="email"/>
+                <field name="document_filename"/>
+                <field name="status"/>
+                <field name="reviewed_at"/>
+                <field name="reviewer_id"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_wavii_teacher_verification_form" model="ir.ui.view">
+        <field name="name">wavii.teacher.verification.form</field>
+        <field name="model">wavii.teacher.verification</field>
+        <field name="arch" type="xml">
+            <form string="Wavii Verification">
+                <header>
+                    <button name="action_open_document" type="object" string="Descargar PDF" class="btn-secondary" invisible="not document_attachment_id"/>
+                    <button name="action_approve" type="object" string="Aprobar" class="btn-primary" invisible="status != 'pending'"/>
+                    <button name="action_reject" type="object" string="Rechazar" class="btn-danger" invisible="status != 'pending'"/>
+                    <field name="status" widget="statusbar" statusbar_visible="pending,approved,rejected"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="user_id" readonly="1"/>
+                            <field name="teacher_name" readonly="1"/>
+                            <field name="email" readonly="1"/>
+                            <field name="document_filename" readonly="1"/>
+                            <field name="document_attachment_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="created_at" readonly="1"/>
+                            <field name="reviewed_at" readonly="1"/>
+                            <field name="reviewer_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Chatter">
+                            <field name="message_follower_ids"/>
+                            <field name="activity_ids"/>
+                            <field name="message_ids"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_wavii_teacher_verification_search" model="ir.ui.view">
+        <field name="name">wavii.teacher.verification.search</field>
+        <field name="model">wavii.teacher.verification</field>
+        <field name="arch" type="xml">
+            <search string="Search Verifications">
+                <field name="teacher_name"/>
+                <field name="email"/>
+                <field name="user_id"/>
+                <filter name="pending" string="Pendientes" domain="[('status', '=', 'pending')]"/>
+                <filter name="approved" string="Aprobadas" domain="[('status', '=', 'approved')]"/>
+                <filter name="rejected" string="Rechazadas" domain="[('status', '=', 'rejected')]"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_wavii_teacher_verification" model="ir.actions.act_window">
+        <field name="name">Verificaciones Wavii</field>
+        <field name="res_model">wavii.teacher.verification</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="view_wavii_teacher_verification_search"/>
+        <field name="help" type="html">
+            <p>Gestiona la aprobación o rechazo de verificaciones docentes de Wavii.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_wavii_root" name="Wavii" sequence="20"/>
+    <menuitem id="menu_wavii_verification" name="Verificaciones Wavii" parent="menu_wavii_root" action="action_wavii_teacher_verification" sequence="10"/>
+</odoo>

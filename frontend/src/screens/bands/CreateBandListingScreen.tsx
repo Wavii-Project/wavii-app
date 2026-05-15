@@ -315,10 +315,23 @@ export const CreateBandListingScreen = () => {
     setError(null);
     setLoading(true);
     try {
-      const coverImageUrl = coverAsset ? (await apiUploadBandImage(coverAsset, token)).url : undefined;
+      let coverImageUrl: string | undefined;
+      if (coverAsset) {
+        try {
+          coverImageUrl = (await apiUploadBandImage(coverAsset, token)).url;
+        } catch (e: any) {
+          setError(e?.response?.data?.message ?? 'No se pudo subir la foto principal.');
+          return;
+        }
+      }
       const imageUrls: string[] = [];
       for (const asset of galleryAssets.slice(0, 3)) {
-        imageUrls.push((await apiUploadBandImage(asset, token)).url);
+        try {
+          imageUrls.push((await apiUploadBandImage(asset, token)).url);
+        } catch (e: any) {
+          setError(e?.response?.data?.message ?? 'No se pudo subir una imagen de la galeria.');
+          return;
+        }
       }
       await apiCreateBandListing(
         {
@@ -336,9 +349,18 @@ export const CreateBandListingScreen = () => {
       );
       navigation.goBack();
     } catch (e: any) {
-      const is401 = e?.response?.status === 401 || e?.message === 'SESSION_INVALID';
-      if (is401) {
+      const status = e?.response?.status as number | undefined;
+      const isAuthError =
+        status === 401 ||
+        status === 403 ||
+        e?.message === 'SESSION_INVALID';
+
+      if (isAuthError) {
         setError('Tu sesión ha expirado. Cierra sesión y vuelve a entrar.');
+      } else if (status === 404) {
+        setError('Servicio de bandas no disponible (ruta incorrecta).');
+      } else if (status && status >= 500) {
+        setError(e?.response?.data?.message ?? 'Error del servidor. Intentalo de nuevo en unos segundos.');
       } else {
         setError(e?.response?.data?.message ?? 'No se pudo publicar el anuncio.');
       }

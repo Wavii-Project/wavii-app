@@ -53,7 +53,7 @@ export const OnboardingCertifiedVerification: React.FC<Props> = ({ navigation })
   const handlePickDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/*'],
+        type: 'application/pdf',
         copyToCacheDirectory: true,
       });
 
@@ -73,7 +73,7 @@ export const OnboardingCertifiedVerification: React.FC<Props> = ({ navigation })
 
   const handleUpload = async () => {
     if (!pickedFile) {
-      showAlert({ title: 'Documento requerido', message: 'Selecciona un PDF o imagen de tu titulación.' });
+      showAlert({ title: 'Documento requerido', message: 'Selecciona un PDF de tu titulación.' });
       return;
     }
     setUploading(true);
@@ -163,7 +163,7 @@ export const OnboardingCertifiedVerification: React.FC<Props> = ({ navigation })
               {pickedFile ? pickedFile.name : 'Seleccionar documento'}
             </Text>
             <Text style={[styles.uploadNote, { color: colors.textSecondary }]}>
-              {pickedFile ? 'Toca para cambiar' : 'PDF o imagen — Toca para seleccionar'}
+              {pickedFile ? 'Toca para cambiar' : 'Solo PDF — Toca para seleccionar'}
             </Text>
           </TouchableOpacity>
         )}

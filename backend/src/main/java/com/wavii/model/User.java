@@ -1,5 +1,6 @@
 package com.wavii.model;
 
+import com.wavii.model.converter.SubscriptionConverter;
 import com.wavii.model.enums.Level;
 import com.wavii.model.enums.Role;
 import com.wavii.model.enums.Subscription;
@@ -52,8 +53,8 @@ public class User implements UserDetails {
     @Builder.Default
     private Role role = Role.USUARIO;
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Convert(converter = SubscriptionConverter.class)
     @Builder.Default
     private Subscription subscription = Subscription.FREE;
 

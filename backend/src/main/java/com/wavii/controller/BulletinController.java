@@ -253,7 +253,7 @@ public class BulletinController {
 
     /** Comprueba si el usuario tiene acceso completo al tablón (Plan Scholar). */
     private boolean hasScholarAccess(User user) {
-        return user != null && user.getSubscription() == Subscription.EDUCATION;
+        return user != null && user.getSubscription() == Subscription.SCHOLAR;
     }
 
     /** Comprueba si el usuario puede publicar en el tablón. */

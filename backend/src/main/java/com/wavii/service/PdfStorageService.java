@@ -288,7 +288,11 @@ public class PdfStorageService {
                 .orElseThrow(() -> new SecurityException("No autorizado o PDF no encontrado"));
         Files.deleteIfExists(Paths.get(doc.getFilePath()));
         if (doc.getCoverImagePath() != null && !doc.getCoverImagePath().isBlank()) {
-            Files.deleteIfExists(Paths.get("/app/uploads").resolve(doc.getCoverImagePath().substring("pdfs/".length())));
+            Path uploadsRoot = Paths.get(storagePath).getParent();
+            if (uploadsRoot == null) {
+                uploadsRoot = Paths.get("uploads");
+            }
+            Files.deleteIfExists(uploadsRoot.resolve(doc.getCoverImagePath()));
         }
         likeRepository.deleteByPdfId(id);
         reportRepository.deleteByPdfDocumentId(id);

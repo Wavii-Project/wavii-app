@@ -89,6 +89,8 @@ services:
       ODOO_USER: ${ODOO_USER:-admin}
       ODOO_PASSWORD: ${ODOO_PASSWORD:-wavii_admin_2026}
       ODOO_WEBHOOK_SECRET: ${ODOO_WEBHOOK_SECRET:-}
+    volumes:
+      - backend_uploads:/app/uploads
     ports:
       - "8080:8080"
     depends_on:
@@ -161,6 +163,7 @@ services:
     volumes:
       - odoo_data:/var/lib/odoo
       - ./odoo/odoo.conf:/etc/odoo/odoo.conf:ro
+      - ./odoo/addons:/mnt/extra-addons:ro
     networks:
       - wavii-net
 
@@ -181,6 +184,8 @@ volumes:
     name: wavii_mongo_data
   odoo_data:
     name: wavii_odoo_data
+  backend_uploads:
+    name: wavii_backend_uploads
   certbot_certs:
     name: wavii_certbot_certs   # certificados Let's Encrypt (persisten entre reinicios)
   certbot_www:

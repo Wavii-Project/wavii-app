@@ -10,6 +10,7 @@ import {
   TextInput,
   Platform,
   Image,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,7 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { apiUpdateName, apiScheduleDeletion, apiCancelDeletion } from '../../api/userApi';
+import { apiUpdateName, apiScheduleDeletion, apiCancelDeletion, apiSetAcceptsMessages, apiCheckNameForUpdate } from '../../api/userApi';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -26,6 +27,7 @@ import { useAlert } from '../../context/AlertContext';
 import { useTutorial } from '../../context/TutorialContext';
 import { WaviiPromoBanner } from '../../components/common/WaviiPromoBanner';
 import { Colors, FontFamily, FontSize, Spacing, BorderRadius } from '../../theme';
+import { normalizeSubscription } from '../../utils/subscription';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -74,16 +76,54 @@ export const ProfileScreen: React.FC = () => {
   const [nameInput, setNameInput] = useState('');
   const [nameLoading, setNameLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  
+  const [acceptsMessages, setAcceptsMessages] = useState<boolean>(true);
+  const [messagesToggleLoading, setMessagesToggleLoading] = useState(false);
+
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deleteCountdown, setDeleteCountdown] = useState(10);
 
   const avatarKey = user ? `wavii_avatar_${user.id}` : null;
+  const acceptsMsgKey = user ? `wavii_accepts_msg_${user.id}` : null;
 
   useEffect(() => {
     if (!avatarKey) return;
     AsyncStorage.getItem(avatarKey).then((v) => { if (v) setAvatar(v); }).catch(() => {});
   }, [avatarKey]);
+
+  useEffect(() => {
+    if (!acceptsMsgKey) return;
+    AsyncStorage.getItem(acceptsMsgKey).then((v) => {
+      if (v !== null) setAcceptsMessages(v === 'true');
+    }).catch(() => {});
+  }, [acceptsMsgKey]);
+
+  const doToggleMessages = async (value: boolean) => {
+    if (!token || messagesToggleLoading) return;
+    setMessagesToggleLoading(true);
+    setAcceptsMessages(value);
+    try {
+      await apiSetAcceptsMessages(value, token);
+      if (acceptsMsgKey) await AsyncStorage.setItem(acceptsMsgKey, String(value));
+    } catch {
+      setAcceptsMessages(!value);
+      showAlert({ title: 'Error', message: 'No se pudo actualizar la configuración.' });
+    } finally {
+      setMessagesToggleLoading(false);
+    }
+  };
+
+  const handleToggleMessages = (value: boolean) => {
+    showAlert({
+      title: value ? 'Activar mensajes directos' : 'Desactivar mensajes directos',
+      message: value
+        ? '¿Quieres permitir que otros usuarios te envíen mensajes directos?'
+        : '¿Quieres desactivar los mensajes directos? Otros usuarios no podrán escribirte.',
+      buttons: [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: value ? 'Activar' : 'Desactivar', style: 'default', onPress: () => doToggleMessages(value) },
+      ],
+    });
+  };
 
   const handlePickAvatar = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -124,11 +164,16 @@ export const ProfileScreen: React.FC = () => {
   const submitNameChange = async (name: string) => {
     if (!token) return;
     if (name.trim().length < 3) {
-      showAlert({ title: 'Nombre no valido', message: 'El nombre debe tener al menos 3 caracteres.' });
+      showAlert({ title: 'Nombre no válido', message: 'El nombre debe tener al menos 3 caracteres.' });
       return;
     }
     setNameLoading(true);
     try {
+      const available = await apiCheckNameForUpdate(name.trim(), token);
+      if (!available) {
+        showAlert({ title: 'Nombre no disponible', message: `El nombre "${name.trim()}" ya está siendo usado por otro usuario. Elige uno diferente.` });
+        return;
+      }
       const response = await apiUpdateName(name.trim(), token);
       updateUser({ name: response.name });
     } catch (err) {
@@ -230,23 +275,35 @@ export const ProfileScreen: React.FC = () => {
     });
   };
 
+  const currentSubscription = normalizeSubscription(user?.subscription);
   const initial = (user?.name ?? 'U')[0].toUpperCase();
-  const subInfo = SUBSCRIPTION_LABELS[(user?.subscription ?? 'free').toLowerCase()] ?? SUBSCRIPTION_LABELS['free'];
+  const subInfo = SUBSCRIPTION_LABELS[currentSubscription] ?? SUBSCRIPTION_LABELS['free'];
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+      {/* ── Barra de navegación estándar ── */}
+      <View style={[styles.navBar, { borderBottomColor: colors.border }]}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={{ padding: 4 }}
+        >
+          <Ionicons name="chevron-back" size={26} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.navBarTitle, { color: colors.text }]}>Mi perfil</Text>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('UserProfile', { userId: user?.id ?? '' })}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={{ padding: 4 }}
+        >
+          <Ionicons name="eye-outline" size={22} color={colors.text} />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 32 }]} showsVerticalScrollIndicator={false}>
 
         {/* ── Header / Avatar ── */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
-            <Ionicons name="chevron-back" size={28} color={colors.text} />
-          </TouchableOpacity>
-
           <TouchableOpacity style={styles.avatarWrapper} onPress={handlePickAvatar} activeOpacity={0.8}>
             {avatar ? (
               <Image source={{ uri: avatar }} style={styles.avatarImg} />
@@ -317,7 +374,7 @@ export const ProfileScreen: React.FC = () => {
           )}
         </View>
 
-        {user?.subscription === 'plus' ? (
+        {currentSubscription === 'plus' ? (
           <WaviiPromoBanner
             title="Da el salto a Scholar"
             body="Si quieres enseñar dentro de Wavii, Scholar te abre el tablón de anuncios y las herramientas docentes."
@@ -328,7 +385,7 @@ export const ProfileScreen: React.FC = () => {
           />
         ) : null}
 
-        {user?.subscription === 'education' && !user?.teacherVerified ? (
+        {currentSubscription === 'education' && !user?.teacherVerified ? (
           <WaviiPromoBanner
             title="Consigue tu insignia certificada"
             body="Ya tienes Scholar. Sube tu certificado en PDF para que Odoo revise tu perfil y te apruebe como profesor certificado."
@@ -346,7 +403,18 @@ export const ProfileScreen: React.FC = () => {
           <SettingRow icon="lock-closed-outline" label="Cambiar contraseña" onPress={() => navigation.navigate('ChangePassword')} />
           <Divider colors={colors} />
           <SettingRow icon="card-outline" label="Mi suscripción" onPress={() => navigation.navigate('Subscription')} />
-          {user?.subscription === 'education' || user?.role === 'profesor_particular' || user?.role === 'profesor_certificado' ? (
+          <Divider colors={colors} />
+          <View style={styles.row}>
+            <Ionicons name="chatbubble-outline" size={20} color={colors.text} style={styles.rowIcon} />
+            <Text style={[styles.rowLabel, { color: colors.text }]}>Mensajes directos</Text>
+            <Pressable
+              onPress={() => !messagesToggleLoading && handleToggleMessages(!acceptsMessages)}
+              style={[styles.toggleBadge, { backgroundColor: acceptsMessages ? Colors.primary : colors.border }]}
+            >
+              <Text style={styles.toggleBadgeText}>{acceptsMessages ? 'Activo' : 'Inactivo'}</Text>
+            </Pressable>
+          </View>
+          {currentSubscription === 'education' || user?.role === 'profesor_particular' || user?.role === 'profesor_certificado' ? (
             <>
               <Divider colors={colors} />
               <SettingRow
@@ -420,7 +488,6 @@ export const ProfileScreen: React.FC = () => {
           </TouchableOpacity>
         </SectionCard>
 
-        <Text style={[styles.version, { color: colors.textSecondary }]}>Wavii v1.0.0</Text>
       </ScrollView>
 
       {/* ── Android name modal ── */}
@@ -503,24 +570,34 @@ const Divider: React.FC<{ colors: any }> = ({ colors }) => (
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+
+  // Barra de navegación estándar
+  navBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.base,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  navBarTitle: {
+    fontFamily: FontFamily.extraBold,
+    fontSize: FontSize.lg,
+    flex: 1,
+    textAlign: 'center',
+  },
+
   scroll: {
     paddingHorizontal: Spacing.base,
     paddingBottom: 16,
   },
 
-  // Header
+  // Header (avatar section)
   header: {
     alignItems: 'center',
     paddingTop: Spacing.xl,
     paddingBottom: Spacing.base,
     gap: Spacing.xs,
-    position: 'relative',
-  },
-  backButton: {
-    position: 'absolute',
-    left: 0,
-    top: Spacing.xl,
-    zIndex: 10,
   },
   avatarWrapper: {
     marginBottom: Spacing.sm,
@@ -664,12 +741,15 @@ const styles = StyleSheet.create({
     height: 30,
   },
 
-  // Version
-  version: {
-    fontFamily: FontFamily.regular,
+  toggleBadge: {
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 5,
+  },
+  toggleBadgeText: {
+    fontFamily: FontFamily.bold,
     fontSize: FontSize.xs,
-    textAlign: 'center',
-    marginTop: Spacing.xl,
+    color: Colors.white,
   },
 
   // Theme segment

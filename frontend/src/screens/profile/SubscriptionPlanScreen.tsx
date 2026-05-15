@@ -31,6 +31,7 @@ import {
 import { AppStackParamList } from '../../navigation/AppNavigator';
 import { BorderRadius, Colors, FontFamily, FontSize, Spacing } from '../../theme';
 import { PLAN_BY_ID, SubscriptionPlanId } from './subscriptionPlans';
+import { normalizeSubscription } from '../../utils/subscription';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList, 'SubscriptionPlan'>;
 type ScreenRouteProp = RouteProp<AppStackParamList, 'SubscriptionPlan'>;
@@ -63,7 +64,7 @@ export const SubscriptionPlanScreen = () => {
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const currentPlan = (status?.subscription ?? user?.subscription ?? 'free') as SubscriptionPlanId;
+  const currentPlan = normalizeSubscription(status?.subscription ?? user?.subscription ?? 'free') as SubscriptionPlanId;
   const cancelAtPeriodEnd = status?.cancelAtPeriodEnd ?? user?.subscriptionCancelAtPeriodEnd ?? false;
   const currentPeriodEnd = status?.currentPeriodEnd ?? user?.subscriptionCurrentPeriodEnd;
   const subscriptionStatus = status?.subscriptionStatus ?? '';
@@ -83,19 +84,22 @@ export const SubscriptionPlanScreen = () => {
     setLoadingStatus(true);
     try {
       const response = await apiGetSubscriptionStatus(token);
-      setStatus(response);
+      const normalizedSubscription = normalizeSubscription(response.subscription);
+      setStatus({ ...response, subscription: normalizedSubscription });
       updateUser({
-        subscription: response.subscription as SubscriptionPlanId,
+        subscription: normalizedSubscription,
         subscriptionCancelAtPeriodEnd: response.cancelAtPeriodEnd,
         subscriptionCurrentPeriodEnd: response.currentPeriodEnd || undefined,
         trialUsed: response.trialUsed,
         deletionScheduledAt: response.deletionScheduledAt || undefined,
       });
+      return { ...response, subscription: normalizedSubscription };
     } catch (err: any) {
       showAlert({
         title: 'No se pudo cargar tu plan',
         message: err?.response?.data?.message ?? 'Vuelve a intentarlo en unos segundos.',
       });
+      return null;
     } finally {
       setLoadingStatus(false);
     }
@@ -156,8 +160,14 @@ export const SubscriptionPlanScreen = () => {
 
         if (setupIntent.devMode) {
           await apiConfirmSubscription(apiPlan, 'dev_mock', token);
-          updateUser({ subscription: targetPlanId });
-          await loadStatus();
+          const refreshedStatus = await loadStatus();
+          if (normalizeSubscription(refreshedStatus?.subscription ?? targetPlanId) !== targetPlanId) {
+            showAlert({
+              title: 'Suscripcion pendiente',
+              message: 'El pago se ha procesado, pero el plan aun no aparece actualizado. Vuelve a abrir esta pantalla en unos segundos.',
+            });
+            return;
+          }
           handlePostActivation(targetPlanId);
           return;
         }
@@ -185,8 +195,14 @@ export const SubscriptionPlanScreen = () => {
         }
 
         await apiConfirmSubscription(apiPlan, setupIntent.setupIntentId, token);
-        updateUser({ subscription: targetPlanId });
-        await loadStatus();
+        const refreshedStatus = await loadStatus();
+        if (normalizeSubscription(refreshedStatus?.subscription ?? targetPlanId) !== targetPlanId) {
+          showAlert({
+            title: 'Suscripcion pendiente',
+            message: 'El pago se ha procesado, pero el plan aun no aparece actualizado. Vuelve a abrir esta pantalla en unos segundos.',
+          });
+          return;
+        }
         handlePostActivation(targetPlanId);
       } catch (err: any) {
         showAlert({
@@ -220,7 +236,15 @@ export const SubscriptionPlanScreen = () => {
         subscriptionCancelAtPeriodEnd: false,
         subscriptionCurrentPeriodEnd: result.currentPeriodEnd || undefined,
       });
-      await loadStatus();
+      const refreshedStatus = await loadStatus();
+      if (normalizeSubscription(refreshedStatus?.subscription ?? planId) !== planId) {
+        showAlert({
+          title: 'Cambio pendiente',
+          message: 'Stripe ha aceptado el cambio, pero el plan aun no aparece actualizado. Vuelve a revisar esta pantalla en unos segundos.',
+        });
+        setActionLoading(false);
+        return;
+      }
 
       const message =
         planId === 'education' && result.promoApplied

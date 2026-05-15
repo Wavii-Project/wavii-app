@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -20,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../api/config';
 import { BorderRadius, Colors, FontFamily, FontSize, Spacing } from '../../theme';
 import { AppStackParamList } from '../../navigation/AppNavigator';
+import { ChatSocketState, getPollingInterval, getReconnectDelay, getSocketStatusLabel, sanitizeWsUrl } from '../../utils/chatRealtime';
 import {
   ForumCategory,
   ForumDetail,
@@ -44,13 +45,13 @@ const CATEGORY_LABELS: Record<ForumCategory, string> = {
 };
 
 const CATEGORY_COLORS: Record<ForumCategory, string> = {
-  FANDOM: '#8B5CF6',
-  COMUNIDAD_MUSICAL: '#3B82F6',
-  TEORIA: '#14B8A6',
+  FANDOM: Colors.accentPurple,
+  COMUNIDAD_MUSICAL: Colors.accentBlue,
+  TEORIA: Colors.accentTeal,
   INSTRUMENTOS: Colors.primary,
-  BANDAS: '#EC4899',
-  ARTISTAS: '#F59E0B',
-  GENERAL: '#6B7280',
+  BANDAS: Colors.accentPink,
+  ARTISTAS: Colors.warning,
+  GENERAL: Colors.freeTier,
 };
 
 function timeAgo(isoString: string): string {
@@ -103,11 +104,11 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
         {!isMe ? (
           <Text style={[styles.postAuthor, { color: Colors.primary }]}>{post.authorName}</Text>
         ) : null}
-        <Text style={[styles.postContent, { color: isMe ? '#FFFFFF' : colors.text }]}>{post.content}</Text>
+        <Text style={[styles.postContent, { color: isMe ? Colors.white : colors.text }]}>{post.content}</Text>
         <Text
           style={[
             styles.postTime,
-            { color: isMe ? 'rgba(255,255,255,0.6)' : colors.textSecondary },
+            { color: isMe ? Colors.whiteOpacity60 : colors.textSecondary },
           ]}
         >
           {timeAgo(post.createdAt)}
@@ -119,6 +120,7 @@ function PostCard({ post, currentUserId }: { post: Post; currentUserId: string }
 
 export const ForumDetailScreen = () => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { token, user } = useAuth();
   const navigation = useNavigation<Navigation>();
   const route = useRoute<ForumDetailRoute>();
@@ -133,9 +135,14 @@ export const ForumDetailScreen = () => {
   const [toggling, setToggling] = useState(false);
   const [draftText, setDraftText] = useState('');
   const [sending, setSending] = useState(false);
+  const [socketState, setSocketState] = useState<ChatSocketState>('connecting');
+  const [connectVersion, setConnectVersion] = useState(0);
   const listRef = useRef<FlatList<Post>>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const isFocused = useIsFocused();
+  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptRef = useRef(0);
+  const manualCloseRef = useRef(false);
 
   // Ref para controlar el loading sin meterlo en las deps de useCallback
   // (evita el bucle infinito loadingPosts→loadPosts→useEffect→loadPosts…)
@@ -154,6 +161,16 @@ export const ForumDetailScreen = () => {
       setLoadingForum(false);
     }
   }, [forumId, token]);
+
+  const mergeLatestPosts = useCallback((incoming: Post[]) => {
+    setPosts((prev) => {
+      const map = new Map<string, Post>();
+      [...incoming, ...prev].forEach((post) => map.set(post.id, post));
+      return Array.from(map.values()).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    });
+  }, []);
 
   // Carga paginada de posts — deps estables (sin loadingPosts ni hasMore en estado)
   const loadPosts = useCallback(
@@ -202,10 +219,37 @@ export const ForumDetailScreen = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forum?.joined]);
 
+  const scheduleReconnect = useCallback(() => {
+    if (!isFocused || !token || reconnectRef.current) return;
+    const delay = getReconnectDelay(reconnectAttemptRef.current);
+    reconnectAttemptRef.current += 1;
+    reconnectRef.current = setTimeout(() => {
+      reconnectRef.current = null;
+      setSocketState('connecting');
+      setConnectVersion((current) => current + 1);
+    }, delay);
+  }, [isFocused, token]);
+
   useEffect(() => {
-    if (!token || !forum?.joined) return;
+    if (!token || !forum?.joined || !isFocused) return;
+    let cancelled = false;
+    manualCloseRef.current = false;
+    setSocketState('connecting');
     const socket = new WebSocket(wsUrl);
     socketRef.current = socket;
+
+    if (__DEV__) {
+      console.log('[ForumDetailScreen] WS connect', sanitizeWsUrl(wsUrl));
+    }
+
+    socket.onopen = () => {
+      reconnectAttemptRef.current = 0;
+      setSocketState('open');
+      void loadPosts(0, true);
+      if (__DEV__) {
+        console.log('[ForumDetailScreen] WS open');
+      }
+    };
 
     socket.onmessage = (event) => {
       try {
@@ -220,11 +264,44 @@ export const ForumDetailScreen = () => {
       }
     };
 
+    socket.onerror = () => {
+      if (cancelled) return;
+      setSocketState('error');
+      scheduleReconnect();
+      try {
+        socket.close();
+      } catch {
+        // ignore
+      }
+      if (__DEV__) {
+        console.log('[ForumDetailScreen] WS error');
+      }
+    };
+
+    socket.onclose = (event) => {
+      socketRef.current = null;
+      if (cancelled || manualCloseRef.current) {
+        return;
+      }
+      setSocketState(event.wasClean ? 'closed' : 'error');
+      scheduleReconnect();
+      if (__DEV__) {
+        console.log('[ForumDetailScreen] WS close', event.code);
+      }
+    };
+
     return () => {
+      cancelled = true;
+      manualCloseRef.current = true;
+      if (reconnectRef.current) {
+        clearTimeout(reconnectRef.current);
+        reconnectRef.current = null;
+      }
       socket.close();
       socketRef.current = null;
+      setSocketState('closed');
     };
-  }, [forum?.joined, token, wsUrl]);
+  }, [connectVersion, forum?.joined, isFocused, loadPosts, scheduleReconnect, token, wsUrl]);
 
   // Polling fallback: refresh page-0 every 5s when focused so messages received
   // while the other user's WS was not open still appear without leaving the screen.
@@ -234,22 +311,13 @@ export const ForumDetailScreen = () => {
       if (!token || loadingPostsRef.current) return;
       try {
         const data = await apiGetPosts(forumId, 0, token);
-        const incoming = data.content ?? [];
-        setPosts((prev) => {
-          const map = new Map<string, Post>();
-          // incoming first so existing posts keep their position if merged
-          [...incoming, ...prev].forEach((p) => map.set(p.id, p));
-          // Keep chronological order: newest first (inverted list)
-          return Array.from(map.values()).sort(
-            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-        });
+        mergeLatestPosts(data.content ?? []);
       } catch {
         // silent
       }
-    }, 5000);
+    }, getPollingInterval(socketState));
     return () => clearInterval(interval);
-  }, [forumId, isFocused, forum?.joined, token]);
+  }, [forumId, isFocused, forum?.joined, mergeLatestPosts, socketState, token]);
 
   const handleToggle = async () => {
     if (!token || !forum || toggling) {
@@ -299,7 +367,7 @@ export const ForumDetailScreen = () => {
   const categoryLabel = forum ? CATEGORY_LABELS[forum.category] ?? forum.category : '';
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -324,7 +392,7 @@ export const ForumDetailScreen = () => {
               <View style={styles.headerMeta}>
                 <View style={[styles.categoryDot, { backgroundColor: color }]} />
                 <Text style={[styles.headerSub, { color: colors.textSecondary }]}>
-                  {categoryLabel} · {forum?.memberCount ?? 0} miembros
+                  {getSocketStatusLabel(socketState) ?? `${categoryLabel} · ${forum?.memberCount ?? 0} miembros`}
                 </Text>
               </View>
             </>
@@ -335,19 +403,19 @@ export const ForumDetailScreen = () => {
           <TouchableOpacity
             style={[
               styles.joinButton,
-              { borderColor: color, backgroundColor: forum.joined ? 'transparent' : color },
+              { borderColor: color, backgroundColor: forum.joined ? Colors.transparent : color },
             ]}
             onPress={handleToggle}
             disabled={toggling}
             activeOpacity={0.8}
           >
             {toggling ? (
-              <ActivityIndicator size={12} color={forum.joined ? color : '#FFFFFF'} />
+              <ActivityIndicator size={12} color={forum.joined ? color : Colors.white} />
             ) : (
-              <Text style={[styles.joinButtonText, { color: forum.joined ? color : '#FFFFFF' }]}>
-              {forum.joined ? 'Perfil' : 'Unirse'}
-            </Text>
-          )}
+              <Text style={[styles.joinButtonText, { color: forum.joined ? color : Colors.white }]}>
+                {forum.joined ? 'Perfil' : 'Unirse'}
+              </Text>
+            )}
           </TouchableOpacity>
         ) : null}
       </View>
@@ -411,7 +479,7 @@ export const ForumDetailScreen = () => {
           <View
             style={[
               styles.inputRow,
-              { backgroundColor: colors.surface, borderTopColor: colors.border },
+              { backgroundColor: colors.surface, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, Spacing.sm) },
             ]}
           >
             <TextInput
@@ -439,9 +507,9 @@ export const ForumDetailScreen = () => {
               disabled={!draftText.trim() || sending}
             >
               {sending ? (
-                <ActivityIndicator size={16} color="#FFFFFF" />
+                <ActivityIndicator size={16} color={Colors.white} />
               ) : (
-                <Ionicons name="send" size={16} color="#FFFFFF" />
+                <Ionicons name="send" size={16} color={Colors.white} />
               )}
             </Pressable>
           </View>
@@ -463,7 +531,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
     paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
+    paddingVertical: 12,
     borderBottomWidth: 1,
   },
   headerCenter: {

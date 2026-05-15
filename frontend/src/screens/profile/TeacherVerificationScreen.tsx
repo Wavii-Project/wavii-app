@@ -60,7 +60,7 @@ export const TeacherVerificationScreen: React.FC = () => {
   const handlePickDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/*'],
+        type: 'application/pdf',
         copyToCacheDirectory: true,
       });
 
@@ -81,7 +81,7 @@ export const TeacherVerificationScreen: React.FC = () => {
 
   const handleUpload = async () => {
     if (!token || !pickedFile) {
-      showAlert({ title: 'Documento requerido', message: 'Selecciona un PDF o imagen de tu certificado.' });
+      showAlert({ title: 'Documento requerido', message: 'Selecciona un PDF de tu certificado.' });
       return;
     }
 
@@ -190,7 +190,7 @@ export const TeacherVerificationScreen: React.FC = () => {
                   {pickedFile ? pickedFile.name : 'Seleccionar documento'}
                 </Text>
                 <Text style={[styles.uploadNote, { color: colors.textSecondary }]}>
-                  PDF recomendado. También aceptamos imagen si aún no lo tienes escaneado.
+                  Solo se aceptan archivos PDF.
                 </Text>
               </TouchableOpacity>
 

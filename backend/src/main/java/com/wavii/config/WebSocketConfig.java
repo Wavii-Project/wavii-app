@@ -1,6 +1,7 @@
 package com.wavii.config;
 
 import com.wavii.service.ClassChatWebSocketHandler;
+import com.wavii.service.DirectMessageWebSocketHandler;
 import com.wavii.service.ForumChatWebSocketHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
@@ -21,12 +22,15 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     private final ClassChatWebSocketHandler classChatWebSocketHandler;
     private final ForumChatWebSocketHandler forumChatWebSocketHandler;
+    private final DirectMessageWebSocketHandler directMessageWebSocketHandler;
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(classChatWebSocketHandler, "/ws/classes")
                 .setAllowedOriginPatterns("*");
         registry.addHandler(forumChatWebSocketHandler, "/ws/forums")
+                .setAllowedOriginPatterns("*");
+        registry.addHandler(directMessageWebSocketHandler, "/ws/direct")
                 .setAllowedOriginPatterns("*");
     }
 }

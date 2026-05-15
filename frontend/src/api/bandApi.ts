@@ -97,7 +97,6 @@ export const apiUploadBandImage = (
     .post<BandImageUploadResponse>('/api/bands/images', form, {
       headers: {
         ...authHeader(token),
-        'Content-Type': 'multipart/form-data',
       },
     })
     .then(r => r.data);

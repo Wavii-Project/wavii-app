@@ -1,7 +1,6 @@
 package com.wavii.dto.auth;
 
 import com.wavii.model.enums.Role;
-import com.wavii.model.enums.Subscription;
 import lombok.Builder;
 import lombok.Data;
 
@@ -24,7 +23,7 @@ public class AuthResponse {
     private String email;
     private String city;
     private Role role;
-    private Subscription subscription;
+    private String subscription;
     private boolean emailVerified;
     private boolean onboardingCompleted;
     private boolean teacherVerified;

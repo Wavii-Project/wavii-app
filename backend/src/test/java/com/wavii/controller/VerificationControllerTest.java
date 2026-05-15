@@ -86,6 +86,30 @@ class VerificationControllerTest {
     // ── getStatus ─────────────────────────────────────────────────
 
     @Test
+    void uploadDocumentNonPdfMimeTypeReturnsBadRequestTest() {
+        MultipartFile file = mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        when(file.getOriginalFilename()).thenReturn("test.pdf");
+        when(file.getContentType()).thenReturn("image/jpeg");
+
+        ResponseEntity<?> result = verificationController.uploadDocument(file, currentUser);
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+    }
+
+    @Test
+    void uploadDocumentNonPdfExtensionReturnsBadRequestTest() {
+        MultipartFile file = mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        when(file.getOriginalFilename()).thenReturn("test.jpg");
+        when(file.getContentType()).thenReturn("application/pdf");
+
+        ResponseEntity<?> result = verificationController.uploadDocument(file, currentUser);
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+    }
+
+    @Test
     void getStatusWithPendingRequestReturnsRequestInfoTest() {
         when(verificationRequestRepository.findTopByUserOrderByCreatedAtDesc(currentUser))
                 .thenReturn(Optional.of(verificationRequest));
@@ -263,6 +287,7 @@ class VerificationControllerTest {
         MultipartFile file = mock(MultipartFile.class);
         when(file.isEmpty()).thenReturn(false);
         when(file.getOriginalFilename()).thenReturn("test.pdf");
+        when(file.getContentType()).thenReturn("application/pdf");
         when(file.getInputStream()).thenThrow(new java.io.IOException("Disk full"));
 
         // Override UPLOAD_DIR to a temp path so createDirectories doesn't fail

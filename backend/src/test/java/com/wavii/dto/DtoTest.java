@@ -20,7 +20,6 @@ import com.wavii.model.User;
 import com.wavii.model.enums.ForumMembershipRole;
 import com.wavii.model.enums.Level;
 import com.wavii.model.enums.Role;
-import com.wavii.model.enums.Subscription;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -44,7 +43,7 @@ class DtoTest {
                 .email("test@test.com")
                 .city("Madrid")
                 .role(Role.USUARIO)
-                .subscription(Subscription.FREE)
+                .subscription("free")
                 .emailVerified(true)
                 .onboardingCompleted(false)
                 .teacherVerified(false)
@@ -57,7 +56,7 @@ class DtoTest {
         assertEquals("test@test.com", response.getEmail());
         assertEquals("Madrid", response.getCity());
         assertEquals(Role.USUARIO, response.getRole());
-        assertEquals(Subscription.FREE, response.getSubscription());
+        assertEquals("free", response.getSubscription());
         assertTrue(response.isEmailVerified());
         assertFalse(response.isOnboardingCompleted());
         assertFalse(response.isTeacherVerified());

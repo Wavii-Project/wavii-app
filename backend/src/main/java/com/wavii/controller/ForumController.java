@@ -6,7 +6,9 @@ import com.wavii.dto.forum.ForumResponse;
 import com.wavii.dto.forum.ForumSummaryResponse;
 import com.wavii.dto.forum.PostResponse;
 import com.wavii.dto.forum.UpdateForumMemberRoleRequest;
+import com.wavii.dto.forum.UpdateForumRequest;
 import com.wavii.model.User;
+import com.wavii.service.ChatRealtimeBroadcaster;
 import com.wavii.service.ForumService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -45,6 +47,7 @@ import java.util.UUID;
 public class ForumController {
 
     private final ForumService forumService;
+    private final ChatRealtimeBroadcaster chatRealtimeBroadcaster;
 
     @Value("${wavii.app.base-url:http://localhost:8080}")
     private String appBaseUrl;
@@ -84,6 +87,15 @@ public class ForumController {
             @AuthenticationPrincipal User currentUser
     ) {
         return ResponseEntity.status(201).body(forumService.createForum(request, currentUser));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<ForumResponse> updateForum(
+            @PathVariable UUID id,
+            @RequestBody UpdateForumRequest request,
+            @AuthenticationPrincipal User currentUser
+    ) {
+        return ResponseEntity.ok(forumService.updateForum(id, request, currentUser));
     }
 
     @PostMapping("/images")
@@ -168,7 +180,9 @@ public class ForumController {
             @RequestBody CreatePostRequest request,
             @AuthenticationPrincipal User currentUser
     ) {
-        return ResponseEntity.status(201).body(forumService.createPost(id, request, currentUser));
+        PostResponse saved = forumService.createPost(id, request, currentUser);
+        chatRealtimeBroadcaster.broadcast(chatRealtimeBroadcaster.forumRoom(id), saved);
+        return ResponseEntity.status(201).body(saved);
     }
 
     private ResponseEntity<?> uploadImage(MultipartFile file, String folder) {

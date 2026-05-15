@@ -31,6 +31,8 @@ import { ClassRoomScreen } from '../screens/classes/ClassRoomScreen';
 import { ManageClassesScreen } from '../screens/classes/ManageClassesScreen';
 import { TeacherClassStudentsScreen } from '../screens/classes/TeacherClassStudentsScreen';
 import { UserProfileScreen } from '../screens/profile/UserProfileScreen';
+import { UserTabsScreen } from '../screens/profile/UserTabsScreen';
+import { DirectMessageScreen } from '../screens/messages/DirectMessageScreen';
 import type { MainTabParamList } from './MainNavigator';
 
 export type AppStackParamList = {
@@ -64,6 +66,8 @@ export type AppStackParamList = {
   TeacherClassStudents: { mode?: 'students' | 'requests' } | undefined;
   ManageClasses: { focusEnrollmentId?: string } | undefined;
   UserProfile: { userId: string };
+  UserTabs: { userId: string; userName: string };
+  DirectMessage: { userId: string; userName: string };
 };
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
@@ -100,5 +104,7 @@ export const AppNavigator = () => (
     <Stack.Screen name="TeacherClassStudents" component={TeacherClassStudentsScreen} />
     <Stack.Screen name="ManageClasses" component={ManageClassesScreen} />
     <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+    <Stack.Screen name="UserTabs" component={UserTabsScreen} />
+    <Stack.Screen name="DirectMessage" component={DirectMessageScreen} />
   </Stack.Navigator>
 );

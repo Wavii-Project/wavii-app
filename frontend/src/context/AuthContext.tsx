@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE_URL } from '../api/config';
 import { apiCheckEmailVerified, apiLogin, apiRegister, getApiErrorMessage } from '../api/authApi';
+import { normalizeSubscription } from '../utils/subscription';
 import {
   clearStoredSession,
   getStoredAccessToken,
@@ -86,6 +87,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [pendingRefreshToken, setPendingRefreshToken] = useState<string | null>(null);
   const [isNewRegistration, setIsNewRegistration] = useState(false);
 
+  const normalizeUser = useCallback((rawUser: User): User => ({
+    ...rawUser,
+    subscription: normalizeSubscription(rawUser.subscription),
+  }), []);
+
   useEffect(() => {
     const loadSession = async () => {
       try {
@@ -101,7 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (storedToken && storedUser) {
           setToken(storedToken);
-          setUser(JSON.parse(storedUser) as User);
+          setUser(normalizeUser(JSON.parse(storedUser) as User));
         }
       } catch (e) {
         console.warn('Error al cargar sesión:', e);
@@ -127,10 +133,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const saveSession = async (accessToken: string, refreshToken: string | null, nextUser: User) => {
+    const normalizedUser = normalizeUser(nextUser);
     await saveStoredSession(accessToken, refreshToken);
-    await AsyncStorage.setItem(USER_KEY, JSON.stringify(nextUser));
+    await AsyncStorage.setItem(USER_KEY, JSON.stringify(normalizedUser));
     setToken(accessToken);
-    setUser(nextUser);
+    setUser(normalizedUser);
   };
 
   const login = async (email: string, password: string) => {
@@ -146,7 +153,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: response.email,
         city: response.city,
         role: (response.role as User['role']) ?? 'usuario',
-        subscription: (response.subscription as User['subscription']) ?? 'free',
+        subscription: normalizeSubscription(response.subscription),
         level: 'principiante',
         xp: 0,
         streak: 0,
@@ -306,7 +313,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       onboardingCompleted: true,
       ...(data?.level ? { level: data.level } : {}),
       ...(data?.role ? { role: data.role } : {}),
-      ...(data?.subscription ? { subscription: data.subscription } : {}),
+      ...(data?.subscription ? { subscription: normalizeSubscription(data.subscription) } : {}),
     };
     setUser(updated);
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(updated));
@@ -316,13 +323,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser((currentUser) => {
       if (!currentUser) return currentUser;
 
-      const updated = { ...currentUser, ...data };
+      const updated = normalizeUser({ ...currentUser, ...data } as User);
       AsyncStorage.setItem(USER_KEY, JSON.stringify(updated)).catch((e) =>
         console.warn('Error actualizando usuario:', e)
       );
       return updated;
     });
-  }, []);
+  }, [normalizeUser]);
 
   return (
     <AuthContext.Provider

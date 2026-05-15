@@ -35,6 +35,18 @@ const MODALITY_LABELS: Record<string, string> = {
   AMBAS: 'Ambas',
 };
 
+const formatSessionDateTime = (value?: string | null) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day} a las ${hours}:${minutes}`;
+};
+
 const mergeClasses = (current: ClassEnrollment[], incoming: ClassEnrollment[], optimistic?: ClassEnrollment) => {
   const map = new Map<string, ClassEnrollment>();
   [...current, ...incoming].forEach((item) => map.set(item.id, item));
@@ -116,9 +128,14 @@ export const ClassesScreen = () => {
     const statusLabel = STATUS_LABELS[item.paymentStatus?.toLowerCase()] ?? item.paymentStatus ?? 'Pendiente';
     const modalityLabel = MODALITY_LABELS[item.requestedModality || item.modality] ?? item.requestedModality ?? item.modality ?? 'Sin definir';
     const detailLine = [item.instrument ?? 'Clase musical', modalityLabel, item.city].filter(Boolean).join(' · ');
-    const requestSummary = item.requestAvailability?.trim() || 'Disponibilidad pendiente';
     const requestMessage = item.requestMessage?.trim();
     const canOpenChat = item.canChat;
+    const nextSessionLabel = item.nextSession
+      ? `Próxima sesión: ${formatSessionDateTime(item.nextSession.scheduledAt)}`
+      : 'Disponibilidad pendiente';
+    const nextSessionIcon: React.ComponentProps<typeof Ionicons>['name'] = item.nextSession
+      ? 'calendar-outline'
+      : 'time-outline';
 
     return (
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -139,11 +156,6 @@ export const ClassesScreen = () => {
           </View>
         </View>
 
-        <View style={styles.metaRow}>
-          <MetaPill label={modalityLabel} icon="swap-horizontal-outline" colors={colors} />
-          <MetaPill label={requestSummary} icon="time-outline" colors={colors} />
-        </View>
-
         {requestMessage ? (
           <View style={[styles.requestBox, { backgroundColor: colors.background }]}>
             <Text style={[styles.requestLabel, { color: colors.textSecondary }]}>Mensaje</Text>
@@ -151,14 +163,12 @@ export const ClassesScreen = () => {
           </View>
         ) : null}
 
-        {item.nextSession ? (
-          <View style={[styles.sessionRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
-            <Ionicons name="calendar-outline" size={15} color={Colors.primary} />
-            <Text style={[styles.sessionText, { color: colors.text }]} numberOfLines={1}>
-              Próxima sesión: {item.nextSession.scheduledAt.replace('T', ' ').slice(0, 16)}
-            </Text>
-          </View>
-        ) : null}
+        <View style={[styles.sessionRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <Ionicons name={nextSessionIcon} size={15} color={Colors.primary} />
+          <Text style={[styles.sessionText, { color: colors.text }]} numberOfLines={1}>
+            {nextSessionLabel}
+          </Text>
+        </View>
 
         <View style={styles.actionRow}>
           <ActionChip
@@ -285,23 +295,6 @@ export const ClassesScreen = () => {
   );
 };
 
-const MetaPill = ({
-  label,
-  icon,
-  colors,
-}: {
-  label: string;
-  icon: React.ComponentProps<typeof Ionicons>['name'];
-  colors: ReturnType<typeof useTheme>['colors'];
-}) => (
-  <View style={[styles.metaPill, { backgroundColor: colors.background }]}>
-    <Ionicons name={icon} size={13} color={Colors.primary} />
-    <Text style={[styles.metaPillText, { color: colors.textSecondary }]} numberOfLines={1}>
-      {label}
-    </Text>
-  </View>
-);
-
 const ActionChip = ({
   icon,
   label,
@@ -391,18 +384,6 @@ const styles = StyleSheet.create({
   cardSubtitle: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, marginTop: 2, lineHeight: 18 },
   statusBadge: { borderRadius: BorderRadius.md, paddingHorizontal: Spacing.sm, paddingVertical: 6 },
   statusText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs },
-  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
-  metaPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 8,
-    flexGrow: 1,
-    minWidth: 0,
-  },
-  metaPillText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.xs, flexShrink: 1 },
   requestBox: {
     borderRadius: BorderRadius.md,
     padding: Spacing.sm,

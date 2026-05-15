@@ -16,7 +16,7 @@ export const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title, onBack, right
   return (
     <View style={[styles.header, { borderBottomColor: colors.border }]}>
       <Pressable onPress={onBack} style={styles.backBtn} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-        <Ionicons name="arrow-back" size={22} color={colors.text} />
+        <Ionicons name="chevron-back" size={26} color={colors.text} />
       </Pressable>
       <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>{title}</Text>
       <View style={styles.right}>{rightElement ?? null}</View>

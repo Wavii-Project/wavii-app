@@ -825,7 +825,6 @@ const SelectionModal = ({
               <Text style={[styles.dropdownOptionText, { color: selected === option ? Colors.primary : colors.text }]}>
                 {option}
               </Text>
-              {selected === option ? <Ionicons name="checkmark" size={20} color={Colors.primary} /> : null}
             </TouchableOpacity>
           ))}
         </View>

@@ -304,7 +304,7 @@ public class AuthService {
                 .email(user.getEmail())
                 .city(user.getCity())
                 .role(user.getRole())
-                .subscription(user.getSubscription())
+                .subscription(user.getSubscription().toPublicId())
                 .emailVerified(user.isEmailVerified())
                 .onboardingCompleted(user.isOnboardingCompleted())
                 .teacherVerified(user.isTeacherVerified())

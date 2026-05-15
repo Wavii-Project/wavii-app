@@ -124,7 +124,11 @@ export const TeacherClassStudentsScreen = () => {
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>{item.studentName}</Text>
               <Text style={[styles.cardMeta, { color: colors.textSecondary }]}>
-                {item.instrument ?? 'Clase'} · {item.requestedModality ?? item.modality ?? 'Sin modalidad'} · {item.city || 'Sin ciudad'}
+                {[
+                  item.instrument,
+                  (item.requestedModality || item.modality)?.replace(/\w+/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()),
+                  item.city,
+                ].filter(Boolean).join(' · ') || 'Sin información'}
               </Text>
               <View style={styles.actions}>
                 {mode === 'requests' ? (

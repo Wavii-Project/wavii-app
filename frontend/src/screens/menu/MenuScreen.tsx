@@ -9,6 +9,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { NotificationBell } from '../../components/common/NotificationBell';
 import { Colors, FontFamily, FontSize, Spacing, BorderRadius } from '../../theme';
+import { hasScholarAccess } from '../../utils/subscription';
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -32,15 +33,15 @@ export const MenuScreen: React.FC = () => {
   const { colors } = useTheme();
   const { user } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
-  const hasScholarAccess = user?.subscription?.toLowerCase() === 'education';
+  const scholarAccess = hasScholarAccess(user?.subscription);
 
   const options: MenuOption[] = [
     ...MENU_OPTIONS,
     {
       title: 'Mis clases',
-      icon: hasScholarAccess ? 'calendar-outline' : 'lock-closed-outline',
+      icon: scholarAccess ? 'calendar-outline' : 'lock-closed-outline',
       route: 'ManageClasses',
-      color: hasScholarAccess ? Colors.primary : Colors.textSecondary,
+      color: scholarAccess ? Colors.primary : Colors.textSecondary,
     },
   ];
 

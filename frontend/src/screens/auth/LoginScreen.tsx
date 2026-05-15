@@ -148,7 +148,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation, route }) => {
               <Text style={[styles.googleLetter, { color: '#34A853' }]}>l</Text>
               <Text style={[styles.googleLetter, { color: '#EA4335' }]}>e</Text>
             </View>
-            <Text style={[styles.googleText, { color: colors.text }]}>
+            <Text style={[styles.googleText, { color: '#1A1A1A' }]}>
               Continuar con Google
             </Text>
           </TouchableOpacity>

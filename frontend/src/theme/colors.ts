@@ -5,6 +5,18 @@ export const Colors = {
   primaryOpacity05: 'rgba(255,122,0,0.05)',
   primaryOpacity10: 'rgba(255,122,0,0.10)',
   primaryOpacity20: 'rgba(255,122,0,0.20)',
+
+  // Accent colors (avoid hardcoded hex usage across screens)
+  accentBlue: '#3B82F6',
+  accentTeal: '#14B8A6',
+  accentPink: '#EC4899',
+  accentPurple: '#8B5CF6',
+
+  // Common overlays / text opacities
+  overlayDark34: 'rgba(0,0,0,0.34)',
+  whiteOpacity60: 'rgba(255,255,255,0.60)',
+  whiteOpacity70: 'rgba(255,255,255,0.70)',
+
   primaryGradientStart: '#FF9A3C',
   primaryGradientEnd: '#FF5500',
   backgroundLight: '#FFF7ED',

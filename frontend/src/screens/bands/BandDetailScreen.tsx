@@ -52,8 +52,17 @@ const TYPE_LABEL: Record<string, string> = {
   MUSICO_BUSCA_BANDA:  'Músico busca banda',
 };
 
-function InfoRow({ icon, text }: { icon: React.ComponentProps<typeof Ionicons>['name']; text: string }) {
+function InfoRow({ icon, text, onPress }: { icon: React.ComponentProps<typeof Ionicons>['name']; text: string; onPress?: () => void }) {
   const { colors } = useTheme();
+  if (onPress) {
+    return (
+      <Pressable style={styles.infoRow} onPress={onPress}>
+        <Ionicons name={icon} size={16} color={Colors.primary} />
+        <Text style={[styles.infoText, { color: Colors.primary }]}>{text}</Text>
+        <Ionicons name="chevron-forward" size={14} color={Colors.primary} />
+      </Pressable>
+    );
+  }
   return (
     <View style={styles.infoRow}>
       <Ionicons name={icon} size={16} color={colors.textSecondary} />
@@ -137,17 +146,19 @@ export const BandDetailScreen = () => {
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.text} />
+          <Ionicons name="chevron-back" size={26} color={colors.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
           Detalle del anuncio
         </Text>
-        {isOwner && (
-          <Pressable onPress={handleDelete} disabled={deleting}>
+        {isOwner ? (
+          <Pressable onPress={handleDelete} disabled={deleting} style={styles.headerRight}>
             {deleting
               ? <ActivityIndicator size={18} color={Colors.error} />
               : <Ionicons name="trash-outline" size={20} color={Colors.error} />}
           </Pressable>
+        ) : (
+          <View style={styles.headerRight} />
         )}
       </View>
 
@@ -185,7 +196,11 @@ export const BandDetailScreen = () => {
           <View style={[styles.metaDivider, { backgroundColor: colors.border }]} />
           <InfoRow icon="location-outline" text={listing.city} />
           <View style={[styles.metaDivider, { backgroundColor: colors.border }]} />
-          <InfoRow icon="person-outline" text={`Publicado por ${listing.creatorName}`} />
+          <InfoRow
+            icon="person-outline"
+            text={`Publicado por ${listing.creatorName}`}
+            onPress={!isOwner ? () => navigation.navigate('UserProfile', { userId: listing.creatorId }) : undefined}
+          />
         </View>
 
         {/* Description */}
@@ -263,7 +278,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.base, paddingVertical: 12, borderBottomWidth: 1,
   },
   backBtn: { padding: 4 },
-  headerTitle: { flex: 1, fontFamily: FontFamily.bold, fontSize: FontSize.base },
+  headerRight: { width: 28, alignItems: 'flex-end' },
+  headerTitle: { flex: 1, fontFamily: FontFamily.bold, fontSize: FontSize.base, textAlign: 'center' },
 
   body: { padding: Spacing.base, gap: Spacing.base },
 

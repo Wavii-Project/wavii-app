@@ -1,6 +1,7 @@
 package com.wavii.controller;
 
 import com.wavii.model.User;
+import com.wavii.service.ChatRealtimeBroadcaster;
 import com.wavii.service.ClassService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ import java.util.UUID;
 public class ClassController {
 
     private final ClassService classService;
+    private final ChatRealtimeBroadcaster chatRealtimeBroadcaster;
 
     /**
      * Lista las clases en las que participa el usuario actual.
@@ -143,7 +145,12 @@ public class ClassController {
                                          @AuthenticationPrincipal User currentUser,
                                          @RequestBody Map<String, String> body) {
         try {
-            return ResponseEntity.ok(classService.sendMessage(enrollmentId, currentUser, body.get("content")));
+            Map<String, Object> saved = classService.sendMessage(enrollmentId, currentUser, body.get("content"));
+            chatRealtimeBroadcaster.broadcast(
+                    chatRealtimeBroadcaster.classRoom(enrollmentId),
+                    saved
+            );
+            return ResponseEntity.ok(saved);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage()));
         }

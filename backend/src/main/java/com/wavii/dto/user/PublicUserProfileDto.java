@@ -19,7 +19,7 @@ public record PublicUserProfileDto(
         int bestStreak,
         int tabsPublished,
         boolean acceptsMessages,
-        String memberSince      // "2026-05" (año-mes)
+        String memberSince      // "2026-05-12" (año-mes-día)
 ) {
     public static PublicUserProfileDto from(User user, int tabsPublished) {
         return new PublicUserProfileDto(
@@ -33,7 +33,7 @@ public record PublicUserProfileDto(
                 tabsPublished,
                 user.isAcceptsMessages(),
                 user.getCreatedAt() != null
-                        ? user.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM"))
+                        ? user.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
                         : null
         );
     }

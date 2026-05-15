@@ -13,6 +13,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ import java.util.Map;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class OdooService {
     private static final String SUBSCRIPTION_PROJECT = "Suscripciones Wavii";
+    private static final String VERIFICATION_MODEL = "wavii.teacher.verification";
 
     @Value("${odoo.url:}")
     private String odooUrl;
@@ -342,13 +344,25 @@ public class OdooService {
      * @param documentUrl URL para visualizar el documento.
      */
     @Async
-    public void createVerificationTask(String userName, String email, String fileName, String documentUrl) {
+    public void createVerificationTask(
+            String userId,
+            String userName,
+            String email,
+            String fileName,
+            String mimeType,
+            byte[] fileBytes,
+            String documentUrl
+    ) {
         if (!isConfigured()) {
             log.info("[DEV] Odoo no configurado — tarea de verificación no creada para {}", email);
             return;
         }
         try {
             int uid = authenticate();
+            if (createVerificationRecord(uid, userId, userName, email, fileName, mimeType, fileBytes)) {
+                log.info("Odoo: verificacion creada en modulo personalizado para {}", email);
+                return;
+            }
 
             List projCondition = Arrays.asList("name", "=", VERIFICATION_PROJECT);
             List projDomain = new ArrayList();
@@ -365,7 +379,8 @@ public class OdooService {
                 projectId = projects.get(0);
             }
 
-            String description = "Email: " + email
+            String description = "UserId: " + userId
+                    + "\nEmail: " + email
                     + "\nDocumento: " + fileName
                     + (documentUrl != null ? "\nURL: " + documentUrl : "");
 
@@ -374,6 +389,9 @@ public class OdooService {
             taskVals.put("description", description);
             taskVals.put("project_id", projectId);
             int taskId = create(uid, "project.task", taskVals);
+            if (fileBytes != null && fileBytes.length > 0) {
+                createVerificationAttachment(uid, taskId, "project.task", fileName, mimeType, fileBytes);
+            }
             log.info("Odoo: tarea de verificación creada id={} para {}", taskId, email);
         } catch (Exception e) {
             log.warn("Odoo: error creando tarea de verificación para {} — {}", email, e.getMessage());
@@ -388,6 +406,48 @@ public class OdooService {
      * @param title Título de la tarea.
      * @param description Descripción detallada.
      */
+    private boolean createVerificationRecord(
+            int uid,
+            String userId,
+            String userName,
+            String email,
+            String fileName,
+            String mimeType,
+            byte[] fileBytes
+    ) {
+        try {
+            Map<String, Object> vals = new LinkedHashMap<>();
+            vals.put("user_id", userId);
+            vals.put("teacher_name", userName);
+            vals.put("email", email);
+            vals.put("document_filename", fileName);
+            vals.put("status", "pending");
+            int verificationId = create(uid, VERIFICATION_MODEL, vals);
+            if (fileBytes != null && fileBytes.length > 0) {
+                int attachmentId = createVerificationAttachment(uid, verificationId, VERIFICATION_MODEL, fileName, mimeType, fileBytes);
+                List writeArgs = new ArrayList();
+                writeArgs.add(List.of(verificationId));
+                writeArgs.add(Map.of("document_attachment_id", attachmentId));
+                executeKw(uid, VERIFICATION_MODEL, "write", writeArgs);
+            }
+            return true;
+        } catch (Exception e) {
+            log.info("Odoo: modulo {} no disponible, fallback a project.task: {}", VERIFICATION_MODEL, e.getMessage());
+            return false;
+        }
+    }
+
+    private int createVerificationAttachment(int uid, int recordId, String resModel, String fileName, String mimeType, byte[] fileBytes) throws Exception {
+        Map<String, Object> attachmentVals = new LinkedHashMap<>();
+        attachmentVals.put("name", fileName);
+        attachmentVals.put("type", "binary");
+        attachmentVals.put("res_model", resModel);
+        attachmentVals.put("res_id", recordId);
+        attachmentVals.put("mimetype", (mimeType != null && !mimeType.isBlank()) ? mimeType : "application/pdf");
+        attachmentVals.put("datas", Base64.getEncoder().encodeToString(fileBytes));
+        return create(uid, "ir.attachment", attachmentVals);
+    }
+
     @Async
     public void createSubscriptionTask(String userName, String email, String title, String description) {
         if (!isConfigured()) {

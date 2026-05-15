@@ -128,6 +128,15 @@ export const apiUploadForumImage = (
     .then((response) => response.data);
 };
 
+export const apiUpdateForum = (
+  id: string,
+  payload: { name?: string; description?: string; coverImageUrl?: string; category?: ForumCategory },
+  token: string,
+) =>
+  http
+    .patch<ForumDetail>(`/api/forums/${id}`, payload, { headers: authHeader(token) })
+    .then((response) => response.data);
+
 export const apiJoinForum = (id: string, token: string) =>
   http.post(`/api/forums/${id}/join`, {}, { headers: authHeader(token) });
 

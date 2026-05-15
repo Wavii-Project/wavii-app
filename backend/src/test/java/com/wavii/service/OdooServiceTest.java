@@ -140,15 +140,15 @@ class OdooServiceTest {
     @Test
     void createVerificationTaskNotConfiguredDoesNotThrowTest() {
         assertDoesNotThrow(() ->
-                odooService.createVerificationTask("Prof. Test", "prof@test.com",
-                        "certificate.pdf", "http://localhost:8080/uploads/cert.pdf"));
+                odooService.createVerificationTask("user-1", "Prof. Test", "prof@test.com",
+                        "certificate.pdf", "application/pdf", "pdf".getBytes(), "http://localhost:8080/uploads/cert.pdf"));
     }
 
     @Test
     void createVerificationTaskNotConfiguredNullDocumentUrlDoesNotThrowTest() {
         assertDoesNotThrow(() ->
-                odooService.createVerificationTask("Prof. Test", "prof@test.com",
-                        "certificate.pdf", null));
+                odooService.createVerificationTask("user-1", "Prof. Test", "prof@test.com",
+                        "certificate.pdf", "application/pdf", "pdf".getBytes(), null));
     }
 
     @Test
@@ -371,8 +371,8 @@ class OdooServiceTest {
                 .when(mockHttpClient).send(any(HttpRequest.class), any());
 
         assertDoesNotThrow(() ->
-                odooService.createVerificationTask("Prof. Ana", "ana@test.com",
-                        "certificate.pdf", "http://localhost/cert.pdf"));
+                odooService.createVerificationTask("user-1", "Prof. Ana", "ana@test.com",
+                        "certificate.pdf", "application/pdf", "pdf".getBytes(), "http://localhost/cert.pdf"));
     }
 
     @Test
@@ -386,7 +386,8 @@ class OdooServiceTest {
                 .when(mockHttpClient).send(any(HttpRequest.class), any());
 
         assertDoesNotThrow(() ->
-                odooService.createVerificationTask("Prof. Juan", "juan@test.com", "doc.pdf", null));
+                odooService.createVerificationTask("user-1", "Prof. Juan", "juan@test.com", "doc.pdf",
+                        "application/pdf", "pdf".getBytes(), null));
     }
 
     @Test
@@ -396,8 +397,8 @@ class OdooServiceTest {
                 .when(mockHttpClient).send(any(HttpRequest.class), any());
 
         assertDoesNotThrow(() ->
-                odooService.createVerificationTask("Prof. Test", "test@test.com",
-                        "cert.pdf", "http://url.com/cert.pdf"));
+                odooService.createVerificationTask("user-1", "Prof. Test", "test@test.com",
+                        "cert.pdf", "application/pdf", "pdf".getBytes(), "http://url.com/cert.pdf"));
     }
 
     @Test
@@ -411,7 +412,8 @@ class OdooServiceTest {
                 .when(mockHttpClient).send(any(HttpRequest.class), any());
 
         assertDoesNotThrow(() ->
-                odooService.createVerificationTask("Prof. Test", "test@test.com", "cert.pdf", null));
+                odooService.createVerificationTask("user-1", "Prof. Test", "test@test.com", "cert.pdf",
+                        "application/pdf", "pdf".getBytes(), null));
     }
 
     // ── Configured — createSubscriptionTask ──────────────────────

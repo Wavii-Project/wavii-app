@@ -101,6 +101,7 @@ public class SubscriptionController {
             userRepository.save(user);
             return ResponseEntity.ok(Map.of(
                     "subscriptionId", user.getStripeSubscriptionId(),
+                    "subscription", toPublicSubscriptionId(user.getSubscription()),
                     "status", "active",
                     "devMode", true
             ));
@@ -113,7 +114,7 @@ public class SubscriptionController {
 
             applySubscriptionResult(user, req.plan(), result);
             userRepository.save(user);
-            return ResponseEntity.ok(result);
+            return ResponseEntity.ok(withPublicSubscription(result, user.getSubscription()));
 
         } catch (Exception e) {
             log.error("Error confirmando suscripcion: {}", e.getMessage());
@@ -145,6 +146,7 @@ public class SubscriptionController {
             userRepository.save(user);
             return ResponseEntity.ok(Map.of(
                     "subscriptionId", user.getStripeSubscriptionId(),
+                    "subscription", toPublicSubscriptionId(user.getSubscription()),
                     "status", "active",
                     "devMode", true
             ));
@@ -160,7 +162,7 @@ public class SubscriptionController {
 
             applySubscriptionResult(user, req.plan(), result);
             userRepository.save(user);
-            return ResponseEntity.ok(result);
+            return ResponseEntity.ok(withPublicSubscription(result, user.getSubscription()));
 
         } catch (Exception e) {
             log.error("Error al crear suscripcion Stripe: {}", e.getMessage());
@@ -326,7 +328,7 @@ public class SubscriptionController {
                             + "\nEstado Stripe: active"
             );
             return ResponseEntity.ok(Map.of(
-                    "subscription", req.plan(),
+                    "subscription", toPublicSubscriptionId(user.getSubscription()),
                     "status", "active",
                     "cancelAtPeriodEnd", false,
                     "promoApplied", promoApplied,
@@ -359,6 +361,7 @@ public class SubscriptionController {
 
             log.info("Plan de {} cambiado a {}", user.getEmail(), req.plan());
             return ResponseEntity.ok(Map.of(
+                    "subscription", toPublicSubscriptionId(user.getSubscription()),
                     "subscriptionId", result.get("subscriptionId"),
                     "status", result.get("status"),
                     "cancelAtPeriodEnd", result.get("cancelAtPeriodEnd"),
@@ -383,7 +386,7 @@ public class SubscriptionController {
     public ResponseEntity<?> getStatus(Principal principal) {
         User user = getUser(principal);
         return ResponseEntity.ok(Map.of(
-                "subscription", user.getSubscription().name().toLowerCase(),
+                "subscription", toPublicSubscriptionId(user.getSubscription()),
                 "subscriptionStatus", user.getSubscriptionStatus() != null ? user.getSubscriptionStatus() : "none",
                 "stripeSubscriptionId", user.getStripeSubscriptionId() != null ? user.getStripeSubscriptionId() : "",
                 "cancelAtPeriodEnd", user.isSubscriptionCancelAtPeriodEnd(),
@@ -455,6 +458,10 @@ public class SubscriptionController {
 
         userRepository.findByStripeCustomerId(customerId).ifPresentOrElse(user -> {
             user.setSubscriptionStatus("active");
+            Subscription paidPlan = extractSubscriptionFromInvoice(invoice);
+            if (paidPlan != null) {
+                user.setSubscription(paidPlan);
+            }
             if (user.getSubscription() == Subscription.PLUS && !user.isTrialUsed()) {
                 user.setTrialUsed(true);
             }
@@ -473,6 +480,10 @@ public class SubscriptionController {
         Number periodEnd = (Number) sub.get("current_period_end");
 
         userRepository.findByStripeCustomerId(customerId).ifPresent(user -> {
+            Subscription updatedPlan = extractSubscriptionFromSubscriptionObject(sub);
+            if (updatedPlan != null) {
+                user.setSubscription(updatedPlan);
+            }
             if (status != null) user.setSubscriptionStatus(status);
             if (cancelAtEnd != null) user.setSubscriptionCancelAtPeriodEnd(cancelAtEnd);
             if (periodEnd != null) {
@@ -517,7 +528,53 @@ public class SubscriptionController {
 
     /** Mapea el nombre del plan a su valor enum. */
     private Subscription toSubscriptionEnum(String plan) {
-        return "scholar".equals(plan) ? Subscription.EDUCATION : Subscription.PLUS;
+        return "scholar".equals(plan) ? Subscription.SCHOLAR : Subscription.PLUS;
+    }
+
+    private String toPublicSubscriptionId(Subscription subscription) {
+        return subscription == null ? "free" : subscription.toPublicId();
+    }
+
+    private Map<String, Object> withPublicSubscription(Map<String, Object> result, Subscription subscription) {
+        result.put("subscription", toPublicSubscriptionId(subscription));
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Subscription extractSubscriptionFromInvoice(Map<String, Object> invoice) {
+        try {
+            Map<String, Object> lines = (Map<String, Object>) invoice.get("lines");
+            if (lines == null) return null;
+            List<Map<String, Object>> lineData = (List<Map<String, Object>>) lines.get("data");
+            if (lineData == null || lineData.isEmpty()) return null;
+            Map<String, Object> price = (Map<String, Object>) lineData.get(0).get("price");
+            String priceId = price == null ? null : (String) price.get("id");
+            return subscriptionFromPriceId(priceId);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Subscription extractSubscriptionFromSubscriptionObject(Map<String, Object> sub) {
+        try {
+            Map<String, Object> items = (Map<String, Object>) sub.get("items");
+            if (items == null) return null;
+            List<Map<String, Object>> itemData = (List<Map<String, Object>>) items.get("data");
+            if (itemData == null || itemData.isEmpty()) return null;
+            Map<String, Object> price = (Map<String, Object>) itemData.get(0).get("price");
+            String priceId = price == null ? null : (String) price.get("id");
+            return subscriptionFromPriceId(priceId);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private Subscription subscriptionFromPriceId(String priceId) {
+        if (priceId == null || priceId.isBlank()) return null;
+        if (priceId.equals(stripeService.getPricePlus())) return Subscription.PLUS;
+        if (priceId.equals(stripeService.getPriceScholar())) return Subscription.SCHOLAR;
+        return null;
     }
 
     /** Determina si se debe aplicar la promoción Scholar (cambio desde Plus). */

@@ -13,12 +13,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
+  apiClearNotifications,
   apiFetchNotifications,
   apiMarkNotificationRead,
   AppNotification,
 } from '../../api/notificationsApi';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useAlert } from '../../context/AlertContext';
 import { AppStackParamList } from '../../navigation/AppNavigator';
 import { BorderRadius, Colors, FontFamily, FontSize, Spacing } from '../../theme';
 
@@ -37,6 +39,7 @@ export const NotificationBell = ({ size = 'sm' }: NotificationBellProps) => {
   const navigation = useNavigation<Navigation>();
   const { colors } = useTheme();
   const { token } = useAuth();
+  const { showAlert } = useAlert();
   const [unreadCount, setUnreadCount] = useState(0);
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -120,6 +123,40 @@ export const NotificationBell = ({ size = 'sm' }: NotificationBellProps) => {
     [closeModal, navigation]
   );
 
+  const handleClear = useCallback(() => {
+    if (!token || items.length === 0) return;
+    showAlert({
+      title: 'Limpiar notificaciones',
+      message: 'Esta accion eliminara todas tus notificaciones de forma permanente.',
+      buttons: [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Limpiar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await apiClearNotifications(token);
+              setItems([]);
+              setUnreadCount(0);
+              showAlert({
+                title: 'Notificaciones eliminadas',
+                message:
+                  result.removed > 0
+                    ? `Se eliminaron ${result.removed} notificaciones.`
+                    : 'No habia notificaciones para eliminar.',
+              });
+            } catch {
+              showAlert({
+                title: 'Error',
+                message: 'No se pudieron limpiar las notificaciones. Intentalo de nuevo.',
+              });
+            }
+          },
+        },
+      ],
+    });
+  }, [items.length, showAlert, token]);
+
   return (
     <>
       <TouchableOpacity
@@ -167,6 +204,33 @@ export const NotificationBell = ({ size = 'sm' }: NotificationBellProps) => {
                   Tus avisos recientes de clases y agenda.
                 </Text>
               </View>
+              <TouchableOpacity
+                style={[
+                  styles.headerActionButton,
+                  {
+                    borderColor: colors.border,
+                    backgroundColor: colors.surface,
+                    opacity: items.length === 0 ? 0.55 : 1,
+                  },
+                ]}
+                onPress={handleClear}
+                disabled={items.length === 0}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={14}
+                  color={items.length === 0 ? colors.textSecondary : Colors.primary}
+                />
+                <Text
+                  style={[
+                    styles.headerActionText,
+                    { color: items.length === 0 ? colors.textSecondary : colors.text },
+                  ]}
+                >
+                  Limpiar
+                </Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.closeButton, { borderColor: colors.border }]}
                 onPress={closeModal}
@@ -304,6 +368,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  headerActionButton: {
+    minHeight: 30,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  headerActionText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.xs,
   },
   modalList: {
     flexGrow: 0,

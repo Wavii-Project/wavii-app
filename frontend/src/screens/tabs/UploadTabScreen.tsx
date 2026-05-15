@@ -92,7 +92,7 @@ export const UploadTabScreen = () => {
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={22} color={colors.text} />
+            <Ionicons name="chevron-back" size={26} color={colors.text} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Subir tablatura</Text>
           <View style={styles.headerSpacer} />

@@ -13,7 +13,7 @@ export interface PublicUserProfile {
   bestStreak: number;
   tabsPublished: number;
   acceptsMessages: boolean;
-  memberSince: string | null; // "2026-05"
+  memberSince: string | null; // "2026-05-12" (año-mes-día)
 }
 
 export async function apiFetchPublicProfile(userId: string): Promise<PublicUserProfile> {

@@ -207,14 +207,12 @@ export const HomeScreen = () => {
       .finally(() => setLoadingPopular(false));
   }, [token]);
 
-  const handleCompleteChallenge = async (challengeId: number) => {
+  const doCompleteChallenge = async (challengeId: number) => {
     if (!token || completingId !== null) return;
     setCompletingId(challengeId);
     try {
       const result = await apiCompleteChallenge(challengeId);
-      // Actualizar estado local del usuario
       updateUser({ xp: result.totalXp, streak: result.streak, bestStreak: result.bestStreak });
-      // Refrescar lista de desafios
       await loadChallenges();
       if (result.leveledUp) {
         showAlert({ title: '¡Subiste de nivel!', message: `Ahora eres nivel ${result.newLevel}. Sigue practicando.` });
@@ -224,6 +222,17 @@ export const HomeScreen = () => {
     } finally {
       setCompletingId(null);
     }
+  };
+
+  const handleCompleteChallenge = (challengeId: number) => {
+    showAlert({
+      title: 'Completar desafío',
+      message: '¿Seguro que quieres marcar este desafío como hecho?',
+      buttons: [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Confirmar', style: 'destructive', delaySeconds: 5, onPress: () => doCompleteChallenge(challengeId) },
+      ],
+    });
   };
 
   const completedChallenges = challenges.filter((c) => c.completedByMe).length;
@@ -395,7 +404,7 @@ export const HomeScreen = () => {
         {/* ── Últimas Tablaturas ── */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Tablaturas populares</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Tabs')}>
+          <TouchableOpacity onPress={() => navigation.navigate('Tablaturas')}>
             <Text style={styles.linkText}>Ver más</Text>
           </TouchableOpacity>
         </View>
@@ -463,7 +472,17 @@ export const HomeScreen = () => {
             contentContainerStyle={styles.newsScroll}
           >
             {news.map((article) => (
-              <NewsCard key={article.articleId} article={article} colors={colors} isDark={isDark} />
+              <NewsCard
+                key={article.articleId}
+                article={article}
+                colors={colors}
+                isDark={isDark}
+                onPress={() => article.url && navigation.navigate('Article', {
+                  url: article.url,
+                  title: article.title ?? '',
+                  sourceName: article.sourceName ?? undefined,
+                })}
+              />
             ))}
           </ScrollView>
         )}
@@ -665,22 +684,18 @@ const NewsCard = ({
   article,
   colors,
   isDark,
+  onPress,
 }: {
   article: NewsArticle;
   colors: any;
   isDark: boolean;
+  onPress: () => void;
 }) => {
-  const handlePress = () => {
-    if (article.url) {
-      require('react-native').Linking.openURL(article.url).catch(() => { });
-    }
-  };
-
   return (
     <TouchableOpacity
       style={[styles.newsCard, { backgroundColor: colors.surface }]}
       activeOpacity={0.8}
-      onPress={handlePress}
+      onPress={onPress}
     >
       {article.imageUrl ? (
         <Image source={{ uri: article.imageUrl }} style={styles.newsImg} resizeMode="cover" />

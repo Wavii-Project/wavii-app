@@ -21,6 +21,7 @@ import { apiGetSubscriptionStatus, SubscriptionStatusResponse } from '../../api/
 import { AppStackParamList } from '../../navigation/AppNavigator';
 import { BorderRadius, Colors, FontFamily, FontSize, Spacing } from '../../theme';
 import { SUBSCRIPTION_PLANS, SubscriptionPlanId } from './subscriptionPlans';
+import { normalizeSubscription } from '../../utils/subscription';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList, 'Subscription'>;
 type RouteT = RouteProp<AppStackParamList, 'Subscription'>;
@@ -49,7 +50,7 @@ export const SubscriptionScreen = () => {
   const [status, setStatus] = useState<SubscriptionStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const currentPlan = (status?.subscription ?? user?.subscription ?? 'free') as SubscriptionPlanId;
+  const currentPlan = normalizeSubscription(status?.subscription ?? user?.subscription ?? 'free') as SubscriptionPlanId;
   const cancelAtPeriodEnd = status?.cancelAtPeriodEnd ?? user?.subscriptionCancelAtPeriodEnd ?? false;
   const currentPeriodEnd = status?.currentPeriodEnd ?? user?.subscriptionCurrentPeriodEnd;
   const scholarPromoEligible =
@@ -64,19 +65,22 @@ export const SubscriptionScreen = () => {
     setLoading(true);
     try {
       const response = await apiGetSubscriptionStatus(token);
-      setStatus(response);
+      const normalizedSubscription = normalizeSubscription(response.subscription);
+      setStatus({ ...response, subscription: normalizedSubscription });
       updateUser({
-        subscription: response.subscription as SubscriptionPlanId,
+        subscription: normalizedSubscription,
         subscriptionCancelAtPeriodEnd: response.cancelAtPeriodEnd,
         subscriptionCurrentPeriodEnd: response.currentPeriodEnd || undefined,
         trialUsed: response.trialUsed,
         deletionScheduledAt: response.deletionScheduledAt || undefined,
       });
+      return { ...response, subscription: normalizedSubscription };
     } catch (err: any) {
       showAlert({
         title: 'No se pudo cargar tu suscripción',
         message: err?.response?.data?.message ?? 'Vuelve a intentarlo en unos segundos.',
       });
+      return null;
     } finally {
       setLoading(false);
     }

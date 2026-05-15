@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -21,6 +21,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAlert } from '../../context/AlertContext';
 import { AppStackParamList } from '../../navigation/AppNavigator';
 import { BorderRadius, Colors, FontFamily, FontSize, Spacing } from '../../theme';
+import { ChatSocketState, getPollingInterval, getReconnectDelay, getSocketStatusLabel, sanitizeWsUrl } from '../../utils/chatRealtime';
 
 type Route = RouteProp<AppStackParamList, 'ClassRoom'>;
 type Nav = NativeStackNavigationProp<AppStackParamList, 'ClassRoom'>;
@@ -49,7 +50,7 @@ function MessageBubble({
   return (
     <View style={[styles.messageRow, isMe && styles.messageRowMe]}>
       {!isMe && (
-        <View style={[styles.avatar, { backgroundColor: `${Colors.primary}22` }]}>
+        <View style={[styles.avatar, { backgroundColor: Colors.primaryOpacity20 }]}>
           <Text style={[styles.avatarText, { color: Colors.primary }]}>
             {item.senderName.charAt(0).toUpperCase()}
           </Text>
@@ -67,13 +68,13 @@ function MessageBubble({
         {!isMe && (
           <Text style={[styles.senderName, { color: Colors.primary }]}>{item.senderName}</Text>
         )}
-        <Text style={[styles.content, { color: isMe ? '#FFFFFF' : colors.text }]}>
+        <Text style={[styles.content, { color: isMe ? Colors.white : colors.text }]}>
           {item.content}
         </Text>
         <Text
           style={[
             styles.timestamp,
-            { color: isMe ? 'rgba(255,255,255,0.6)' : colors.textSecondary },
+            { color: isMe ? Colors.whiteOpacity60 : colors.textSecondary },
           ]}
         >
           {formatTime(item.createdAt)}
@@ -88,6 +89,7 @@ export const ClassRoomScreen = () => {
   const navigation = useNavigation<Nav>();
   const { token, user } = useAuth();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { showAlert } = useAlert();
   const isFocused = useIsFocused();
 
@@ -97,9 +99,14 @@ export const ClassRoomScreen = () => {
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [socketState, setSocketState] = useState<ChatSocketState>('connecting');
+  const [connectVersion, setConnectVersion] = useState(0);
   const socketRef = useRef<WebSocket | null>(null);
   const hasLoadedRef = useRef(false);
   const listRef = useRef<FlatList<ClassMessage>>(null);
+  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptRef = useRef(0);
+  const manualCloseRef = useRef(false);
 
   // Determine who "the other person" is for the header
   const isTeacher = user?.id !== studentId;
@@ -115,8 +122,9 @@ export const ClassRoomScreen = () => {
     setMessages((prev) => {
       const map = new Map<string, ClassMessage>();
       [...prev, ...incoming].forEach((msg) => map.set(msg.id, msg));
+      // Keep newest first so FlatList inverted renders newest at bottom.
       return Array.from(map.values()).sort(
-        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
     });
   }, []);
@@ -135,33 +143,92 @@ export const ClassRoomScreen = () => {
     }
   }, [enrollmentId, mergeMessages, showAlert, token]);
 
+  const scheduleReconnect = useCallback(() => {
+    if (!isFocused || !token || reconnectRef.current) return;
+    const delay = getReconnectDelay(reconnectAttemptRef.current);
+    reconnectAttemptRef.current += 1;
+    reconnectRef.current = setTimeout(() => {
+      reconnectRef.current = null;
+      setSocketState('connecting');
+      setConnectVersion((current) => current + 1);
+    }, delay);
+  }, [isFocused, token]);
+
   // Initial load
   useEffect(() => {
     load();
   }, [load]);
 
-  // WebSocket
   useEffect(() => {
-    if (!token) return;
+    if (!token || !isFocused) return;
+    let cancelled = false;
+    manualCloseRef.current = false;
+    setSocketState('connecting');
     const socket = new WebSocket(wsUrl);
     socketRef.current = socket;
+
+    if (__DEV__) {
+      console.log('[ClassRoomScreen] WS connect', sanitizeWsUrl(wsUrl));
+    }
+
+    socket.onopen = () => {
+      reconnectAttemptRef.current = 0;
+      setSocketState('open');
+      void load();
+      if (__DEV__) {
+        console.log('[ClassRoomScreen] WS open');
+      }
+    };
 
     socket.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data) as ClassMessage;
         mergeMessages([payload]);
+        listRef.current?.scrollToOffset({ offset: 0, animated: true });
       } catch {
         // ignore malformed frames
       }
     };
 
+    socket.onerror = () => {
+      if (cancelled) return;
+      setSocketState('error');
+      scheduleReconnect();
+      try {
+        socket.close();
+      } catch {
+        // ignore
+      }
+      if (__DEV__) {
+        console.log('[ClassRoomScreen] WS error');
+      }
+    };
+
+    socket.onclose = (event) => {
+      socketRef.current = null;
+      if (cancelled || manualCloseRef.current) {
+        return;
+      }
+      setSocketState(event.wasClean ? 'closed' : 'error');
+      scheduleReconnect();
+      if (__DEV__) {
+        console.log('[ClassRoomScreen] WS close', event.code);
+      }
+    };
+
     return () => {
+      cancelled = true;
+      manualCloseRef.current = true;
+      if (reconnectRef.current) {
+        clearTimeout(reconnectRef.current);
+        reconnectRef.current = null;
+      }
       socket.close();
       socketRef.current = null;
+      setSocketState('closed');
     };
-  }, [token, wsUrl, mergeMessages]);
+  }, [connectVersion, isFocused, load, mergeMessages, scheduleReconnect, token, wsUrl]);
 
-  // Polling fallback: refresh every 5s when focused (covers cases where WS is not open on the other end)
   useEffect(() => {
     if (!isFocused || !hasLoadedRef.current) return;
     const interval = setInterval(async () => {
@@ -172,16 +239,9 @@ export const ClassRoomScreen = () => {
       } catch {
         // silent
       }
-    }, 5000);
+    }, getPollingInterval(socketState));
     return () => clearInterval(interval);
-  }, [enrollmentId, isFocused, mergeMessages, token]);
-
-  // Auto-scroll to end on new messages
-  useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
-    }
-  }, [messages.length]);
+  }, [enrollmentId, isFocused, mergeMessages, socketState, token]);
 
   const send = async () => {
     if (!token || !draft.trim()) return;
@@ -206,7 +266,7 @@ export const ClassRoomScreen = () => {
 
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity
@@ -230,7 +290,9 @@ export const ClassRoomScreen = () => {
           <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
             {headerTitle}
           </Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{headerSubtitle}</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+            {getSocketStatusLabel(socketState) ?? headerSubtitle}
+          </Text>
         </TouchableOpacity>
 
         <View style={{ width: 26 }} />
@@ -252,6 +314,7 @@ export const ClassRoomScreen = () => {
             keyExtractor={(item) => item.id}
             contentContainerStyle={[styles.list, messages.length === 0 && styles.listEmpty]}
             showsVerticalScrollIndicator={false}
+            inverted
             renderItem={({ item }) => (
               <MessageBubble
                 item={item}
@@ -261,12 +324,12 @@ export const ClassRoomScreen = () => {
             )}
             ListEmptyComponent={
               <Text style={[styles.empty, { color: colors.textSecondary }]}>
-                Todavía no hay mensajes. Escribe el primero.
+                Todavia no hay mensajes. Escribe el primero.
               </Text>
             }
           />
 
-          <View style={[styles.composer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+          <View style={[styles.composer, { backgroundColor: colors.surface, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, Spacing.sm) }]}>
             <TextInput
               value={draft}
               onChangeText={setDraft}
@@ -305,7 +368,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
     paddingHorizontal: Spacing.base,
-    paddingVertical: Spacing.sm,
+    paddingVertical: 12,
     borderBottomWidth: 1,
   },
   headerCenter: {

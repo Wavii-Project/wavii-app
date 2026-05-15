@@ -413,6 +413,14 @@ public class StripeService {
         return new Gson().fromJson(payload, Event.class);
     }
 
+    public String getPricePlus() {
+        return pricePlus;
+    }
+
+    public String getPriceScholar() {
+        return priceScholar;
+    }
+
     private Long getCurrentPeriodEnd(Subscription subscription) {
         if (subscription.getItems() == null || subscription.getItems().getData() == null
                 || subscription.getItems().getData().isEmpty()) {
