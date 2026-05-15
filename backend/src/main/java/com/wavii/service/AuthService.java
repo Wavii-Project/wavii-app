@@ -18,6 +18,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Servicio de autenticación y gestión de usuarios.
+ * Maneja el registro, inicio de sesión y recuperación de cuentas.
+ * 
+ * @author eduglezexp
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -33,6 +39,12 @@ public class AuthService {
     private final EmailService emailService;
     private final OdooService odooService;
 
+    /**
+     * Registra un nuevo usuario en el sistema.
+     * 
+     * @param request Datos de registro.
+     * @return Respuesta con los tokens y datos del usuario.
+     */
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByNameIgnoreCase(request.getName().strip())) {
@@ -66,6 +78,12 @@ public class AuthService {
         return buildAuthResponse(user, accessToken, refreshToken);
     }
 
+    /**
+     * Autentica a un usuario y genera sus tokens.
+     * 
+     * @param request Credenciales de login.
+     * @return Respuesta con los tokens y datos del usuario.
+     */
     @Transactional
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
@@ -90,6 +108,12 @@ public class AuthService {
         return buildAuthResponse(user, accessToken, refreshToken);
     }
 
+    /**
+     * Renueva el token de acceso a partir de un refresh token.
+     * 
+     * @param request Contiene el refresh token.
+     * @return Nueva respuesta de autenticación con nuevos tokens.
+     */
     @Transactional
     public AuthResponse refreshToken(RefreshTokenRequest request) {
         String token = request.getRefreshToken();
@@ -114,6 +138,11 @@ public class AuthService {
         return buildAuthResponse(user, newAccessToken, newRefreshToken);
     }
 
+    /**
+     * Inicia el proceso de recuperación de contraseña enviando un email.
+     * 
+     * @param request Contiene el email del usuario.
+     */
     @Transactional
     public void forgotPassword(ForgotPasswordRequest request) {
         userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
@@ -123,6 +152,11 @@ public class AuthService {
         });
     }
 
+    /**
+     * Restablece la contraseña del usuario tras validar el token de recuperación.
+     * 
+     * @param request Contiene el token y la nueva contraseña.
+     */
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
         VerificationToken verificationToken = tokenRepository.findByToken(request.getToken())
@@ -148,6 +182,12 @@ public class AuthService {
         log.debug("Contraseña restablecida para: {}", user.getEmail());
     }
 
+    /**
+     * Verifica el email de un usuario mediante un token.
+     * 
+     * @param token Token de verificación.
+     * @return Respuesta de autenticación para el usuario verificado.
+     */
     @Transactional
     public AuthResponse verifyEmail(String token) {
         VerificationToken verificationToken = tokenRepository.findByToken(token)
@@ -185,6 +225,11 @@ public class AuthService {
         return buildAuthResponse(user, accessToken, refreshToken);
     }
 
+    /**
+     * Reenvía el email de verificación.
+     * 
+     * @param email Email del usuario.
+     */
     @Transactional
     public void resendVerification(String email) {
         User user = userRepository.findByEmail(email)
@@ -199,14 +244,25 @@ public class AuthService {
         emailService.sendVerificationEmail(user.getEmail(), user.getName(), newToken);
     }
 
+    /**
+     * Comprueba si el email está verificado.
+     * 
+     * @param email Email del usuario.
+     * @return true si está verificado.
+     */
     public boolean isEmailVerified(String email) {
         return userRepository.findByEmail(email)
                 .map(User::isEmailVerified)
                 .orElse(false);
     }
 
-    // ---- Private helpers ----
-
+    /**
+     * Crea un token de verificación o restablecimiento de contraseña para un usuario.
+     * 
+     * @param user Usuario para el que se crea el token.
+     * @param type Tipo de token (verificación o reset).
+     * @return El token generado (UUID).
+     */
     private String createVerificationToken(User user, String type) {
         VerificationToken vt = VerificationToken.builder()
                 .token(UUID.randomUUID().toString())
@@ -219,12 +275,26 @@ public class AuthService {
         return vt.getToken();
     }
 
+    /**
+     * Invalida todos los tokens previos no utilizados de un tipo específico para un usuario.
+     * 
+     * @param user Usuario al que pertenecen los tokens.
+     * @param type Tipo de token a invalidar.
+     */
     private void invalidatePreviousTokens(User user, String type) {
         List<VerificationToken> existing = tokenRepository.findAllByUserAndTypeAndUsedFalse(user, type);
         existing.forEach(t -> t.setUsed(true));
         tokenRepository.saveAll(existing);
     }
 
+    /**
+     * Construye el DTO de respuesta de autenticación con los datos del usuario y sus tokens.
+     * 
+     * @param user Usuario autenticado.
+     * @param accessToken Token de acceso generado.
+     * @param refreshToken Token de refresco generado.
+     * @return DTO con la información de sesión.
+     */
     private AuthResponse buildAuthResponse(User user, String accessToken, String refreshToken) {
         return AuthResponse.builder()
                 .accessToken(accessToken)

@@ -8,6 +8,12 @@ import org.springframework.web.filter.CorsFilter;
 
 import java.util.List;
 
+/**
+ * Configuración de CORS (Cross-Origin Resource Sharing).
+ * Permite que el frontend (Expo/Native) se comunique con el backend desde diferentes orígenes.
+ * 
+ * @author eduglezexp
+ */
 @Configuration
 public class CorsConfig {
 

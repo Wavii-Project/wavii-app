@@ -255,4 +255,21 @@ class VerificationControllerTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
     }
+
+    // ── uploadDocument success & IOException ─────────────────────
+
+    @Test
+    void uploadDocumentIoExceptionReturnsInternalServerErrorTest() throws Exception {
+        MultipartFile file = mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        when(file.getOriginalFilename()).thenReturn("test.pdf");
+        when(file.getInputStream()).thenThrow(new java.io.IOException("Disk full"));
+
+        // Override UPLOAD_DIR to a temp path so createDirectories doesn't fail
+        ReflectionTestUtils.setField(verificationController, "appBaseUrl", "http://localhost:8080");
+
+        ResponseEntity<?> result = verificationController.uploadDocument(file, currentUser);
+
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, result.getStatusCode());
+    }
 }

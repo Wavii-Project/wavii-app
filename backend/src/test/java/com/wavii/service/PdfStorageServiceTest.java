@@ -6,6 +6,7 @@ import com.wavii.model.PdfLike;
 import com.wavii.model.User;
 import com.wavii.repository.PdfDocumentRepository;
 import com.wavii.repository.PdfLikeRepository;
+import com.wavii.repository.PdfReportRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +34,7 @@ class PdfStorageServiceTest {
 
     @Mock private PdfDocumentRepository repository;
     @Mock private PdfLikeRepository likeRepository;
+    @Mock private PdfReportRepository reportRepository;
     @Mock private MultipartFile multipartFile;
 
     @InjectMocks private PdfStorageService service;
@@ -392,5 +394,277 @@ class PdfStorageServiceTest {
 
         assertNull(dto.ownerName());
         assertNull(dto.ownerId());
+    }
+
+    @Test
+    void pdfResponseDtoNonNullCoverImagePathPrefixedTest() {
+        doc.setCoverImagePath("pdfs/covers/image.jpg");
+        PdfResponseDto dto = PdfResponseDto.from(doc, false);
+
+        assertEquals("/uploads/pdfs/covers/image.jpg", dto.coverImageUrl());
+    }
+
+    // ─── getPublicFeed sort variants ──────────────────────────────
+
+    @Test
+    void getPublicFeedOldestSortUsesAscendingTest() {
+        when(repository.findAllPublicFeed(any(Pageable.class))).thenReturn(List.of(doc));
+        when(likeRepository.findLikedPdfIds(eq(owner.getId()), any())).thenReturn(List.of());
+
+        List<PdfResponseDto> result = service.getPublicFeed(null, null, "OLDEST", owner);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    void getPublicFeedLeastLikedSortTest() {
+        when(repository.findAllPublicFeed(any(Pageable.class))).thenReturn(List.of(doc));
+        when(likeRepository.findLikedPdfIds(eq(owner.getId()), any())).thenReturn(List.of());
+
+        List<PdfResponseDto> result = service.getPublicFeed(null, null, "LEAST_LIKED", owner);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    void getPublicFeedMostLikedSortTest() {
+        when(repository.findAllPublicFeed(any(Pageable.class))).thenReturn(List.of(doc));
+        when(likeRepository.findLikedPdfIds(eq(owner.getId()), any())).thenReturn(List.of());
+
+        List<PdfResponseDto> result = service.getPublicFeed(null, null, "MOST_LIKED", owner);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    void getPublicFeedNullSortDefaultsToNewestTest() {
+        when(repository.findAllPublicFeed(any(Pageable.class))).thenReturn(List.of(doc));
+        when(likeRepository.findLikedPdfIds(eq(owner.getId()), any())).thenReturn(List.of());
+
+        List<PdfResponseDto> result = service.getPublicFeed(null, null, null, owner);
+
+        assertNotNull(result);
+    }
+
+    // ─── getByIdForUser ───────────────────────────────────────────
+
+    @Test
+    void getByIdForUserCurrentUserLikedReturnsLikedByMeTrueTest() {
+        when(repository.findById(1L)).thenReturn(Optional.of(doc));
+        when(likeRepository.existsByPdfIdAndUserId(1L, owner.getId())).thenReturn(true);
+
+        PdfResponseDto result = service.getByIdForUser(1L, owner);
+
+        assertNotNull(result);
+        assertTrue(result.likedByMe());
+    }
+
+    @Test
+    void getByIdForUserNullUserReturnsFalseForLikedByMeTest() {
+        when(repository.findById(1L)).thenReturn(Optional.of(doc));
+
+        PdfResponseDto result = service.getByIdForUser(1L, null);
+
+        assertNotNull(result);
+        assertFalse(result.likedByMe());
+    }
+
+    // ─── getPublicTabsByUser ───────────────────────────────────────
+
+    @Test
+    void getPublicTabsByUserWithViewerReturnsLikedByMeCorrectlyTest() {
+        when(repository.findPublicByOwnerIdOrderByUploadedAtDesc(owner.getId())).thenReturn(List.of(doc));
+        when(likeRepository.findLikedPdfIds(eq(owner.getId()), any())).thenReturn(List.of(1L));
+
+        List<PdfResponseDto> result = service.getPublicTabsByUser(owner.getId(), owner);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertTrue(result.get(0).likedByMe());
+    }
+
+    @Test
+    void getPublicTabsByUserNullViewerReturnsFalseForLikedByMeTest() {
+        when(repository.findPublicByOwnerIdOrderByUploadedAtDesc(owner.getId())).thenReturn(List.of(doc));
+
+        List<PdfResponseDto> result = service.getPublicTabsByUser(owner.getId(), null);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertFalse(result.get(0).likedByMe());
+    }
+
+    @Test
+    void getPublicTabsByUserEmptyDocsReturnsEmptyTest() {
+        when(repository.findPublicByOwnerIdOrderByUploadedAtDesc(owner.getId())).thenReturn(List.of());
+
+        List<PdfResponseDto> result = service.getPublicTabsByUser(owner.getId(), owner);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+    }
+
+    // ─── loadAsResource ───────────────────────────────────────────
+
+    @Test
+    void loadAsResourceFileNotFoundThrowsRuntimeExceptionTest() {
+        doc.setFilePath("/nonexistent/path/to/file.pdf");
+        when(repository.findById(1L)).thenReturn(Optional.of(doc));
+
+        assertThrows(RuntimeException.class, () -> service.loadAsResource(1L));
+    }
+
+    // ─── delete success ───────────────────────────────────────────
+
+    @Test
+    void deleteSuccessDeletesFileAndRecordTest() throws Exception {
+        java.io.File tempFile = java.io.File.createTempFile("wavii-test", ".pdf");
+        tempFile.deleteOnExit();
+        doc.setFilePath(tempFile.getAbsolutePath());
+        doc.setCoverImagePath(null);
+
+        when(repository.findByIdAndOwner(1L, owner)).thenReturn(Optional.of(doc));
+
+        service.delete(1L, owner);
+
+        verify(likeRepository).deleteByPdfId(1L);
+        verify(reportRepository).deleteByPdfDocumentId(1L);
+        verify(repository).delete(doc);
+    }
+
+    @Test
+    void deleteWithCoverImageDeletesCoverTest() throws Exception {
+        java.io.File tempFile = java.io.File.createTempFile("wavii-test", ".pdf");
+        tempFile.deleteOnExit();
+        doc.setFilePath(tempFile.getAbsolutePath());
+        doc.setCoverImagePath("pdfs/covers/image.jpg");
+
+        when(repository.findByIdAndOwner(1L, owner)).thenReturn(Optional.of(doc));
+
+        service.delete(1L, owner);
+
+        verify(repository).delete(doc);
+    }
+
+    // ─── save with cover image ────────────────────────────────────
+
+    @Test
+    void saveWithCoverImageSavesBothFilesTest() throws Exception {
+        byte[] minimalPdf = "%PDF-1.4\n%%EOF\n".getBytes();
+        MultipartFile coverFile = mock(MultipartFile.class);
+
+        when(multipartFile.isEmpty()).thenReturn(false);
+        when(multipartFile.getContentType()).thenReturn("application/pdf");
+        when(multipartFile.getOriginalFilename()).thenReturn("test.pdf");
+        when(multipartFile.getSize()).thenReturn((long) minimalPdf.length);
+        when(multipartFile.getInputStream()).thenReturn(new ByteArrayInputStream(minimalPdf));
+
+        when(coverFile.isEmpty()).thenReturn(false);
+        when(coverFile.getContentType()).thenReturn("image/jpeg");
+        when(coverFile.getOriginalFilename()).thenReturn("cover.jpg");
+        when(coverFile.getInputStream()).thenReturn(new ByteArrayInputStream("fake-image".getBytes()));
+
+        when(repository.save(any(PdfDocument.class))).thenReturn(doc);
+
+        PdfResponseDto result = service.save(multipartFile, coverFile, owner, "Song", "Desc", 2);
+
+        assertNotNull(result);
+        verify(repository).save(argThat(d -> d.getCoverImagePath() != null));
+    }
+
+    @Test
+    void saveWithCoverImageInvalidTypeThrowsTest() throws Exception {
+        byte[] minimalPdf = "%PDF-1.4\n%%EOF\n".getBytes();
+        MultipartFile coverFile = mock(MultipartFile.class);
+
+        when(multipartFile.isEmpty()).thenReturn(false);
+        when(multipartFile.getContentType()).thenReturn("application/pdf");
+        when(multipartFile.getInputStream()).thenReturn(new ByteArrayInputStream(minimalPdf));
+
+        when(coverFile.isEmpty()).thenReturn(false);
+        when(coverFile.getContentType()).thenReturn("application/pdf");
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.save(multipartFile, coverFile, owner, "Song", "Desc", 2));
+    }
+
+    @Test
+    void saveWithNullCoverImageContentTypeThrowsTest() throws Exception {
+        byte[] minimalPdf = "%PDF-1.4\n%%EOF\n".getBytes();
+        MultipartFile coverFile = mock(MultipartFile.class);
+
+        when(multipartFile.isEmpty()).thenReturn(false);
+        when(multipartFile.getContentType()).thenReturn("application/pdf");
+        when(multipartFile.getInputStream()).thenReturn(new ByteArrayInputStream(minimalPdf));
+
+        when(coverFile.isEmpty()).thenReturn(false);
+        when(coverFile.getContentType()).thenReturn(null);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.save(multipartFile, coverFile, owner, "Song", "Desc", 2));
+    }
+
+    @Test
+    void saveWithEmptyCoverImageSkipsCoverTest() throws Exception {
+        byte[] minimalPdf = "%PDF-1.4\n%%EOF\n".getBytes();
+        MultipartFile coverFile = mock(MultipartFile.class);
+
+        when(multipartFile.isEmpty()).thenReturn(false);
+        when(multipartFile.getContentType()).thenReturn("application/pdf");
+        when(multipartFile.getOriginalFilename()).thenReturn("test.pdf");
+        when(multipartFile.getSize()).thenReturn((long) minimalPdf.length);
+        when(multipartFile.getInputStream()).thenReturn(new ByteArrayInputStream(minimalPdf));
+
+        when(coverFile.isEmpty()).thenReturn(true);
+
+        when(repository.save(any(PdfDocument.class))).thenReturn(doc);
+
+        PdfResponseDto result = service.save(multipartFile, coverFile, owner, "Song", "Desc", 2);
+
+        assertNotNull(result);
+        verify(repository).save(argThat(d -> d.getCoverImagePath() == null));
+    }
+
+    @Test
+    void saveWithCoverImageNoExtensionUsesJpgFallbackTest() throws Exception {
+        byte[] minimalPdf = "%PDF-1.4\n%%EOF\n".getBytes();
+        MultipartFile coverFile = mock(MultipartFile.class);
+
+        when(multipartFile.isEmpty()).thenReturn(false);
+        when(multipartFile.getContentType()).thenReturn("application/pdf");
+        when(multipartFile.getOriginalFilename()).thenReturn("test.pdf");
+        when(multipartFile.getSize()).thenReturn((long) minimalPdf.length);
+        when(multipartFile.getInputStream()).thenReturn(new ByteArrayInputStream(minimalPdf));
+
+        when(coverFile.isEmpty()).thenReturn(false);
+        when(coverFile.getContentType()).thenReturn("image/jpeg");
+        when(coverFile.getOriginalFilename()).thenReturn(null);
+        when(coverFile.getInputStream()).thenReturn(new ByteArrayInputStream("fake-image".getBytes()));
+
+        when(repository.save(any(PdfDocument.class))).thenReturn(doc);
+
+        PdfResponseDto result = service.save(multipartFile, coverFile, owner, "Song", "Desc", 2);
+
+        assertNotNull(result);
+        verify(repository).save(argThat(d -> d.getCoverImagePath() != null && d.getCoverImagePath().endsWith(".jpg")));
+    }
+
+    // ─── loadAsResource when file exists ─────────────────────────
+
+    @Test
+    void loadAsResourceExistingFileReturnsResourceTest() throws Exception {
+        java.io.File tempFile = java.io.File.createTempFile("wavii-load-test", ".pdf");
+        tempFile.deleteOnExit();
+        doc.setFilePath(tempFile.getAbsolutePath());
+
+        when(repository.findById(1L)).thenReturn(Optional.of(doc));
+
+        org.springframework.core.io.Resource resource = service.loadAsResource(1L);
+
+        assertNotNull(resource);
+        assertTrue(resource.exists());
     }
 }

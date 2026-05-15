@@ -6,6 +6,9 @@ import com.wavii.model.enums.MusicianRole;
 
 import java.util.List;
 
+/**
+ * DTO que representa una solicitud para crear un nuevo anuncio de banda.
+ */
 public record CreateBandListingRequest(
         String title,
         String description,

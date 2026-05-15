@@ -19,6 +19,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+/**
+ * Filtro de seguridad para la autenticación mediante tokens JWT.
+ * Intercepta cada petición para validar el token Bearer en el header de Authorization.
+ * 
+ * @author eduglezexp
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j

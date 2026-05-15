@@ -7,6 +7,12 @@ import lombok.Data;
 
 import java.util.UUID;
 
+/**
+ * DTO que contiene la respuesta tras una autenticación exitosa.
+ * Incluye los tokens JWT y la información básica del perfil del usuario.
+ * 
+ * @author eduglezexp
+ */
 @Data
 @Builder
 public class AuthResponse {

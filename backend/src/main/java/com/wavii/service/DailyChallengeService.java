@@ -25,6 +25,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Servicio para la gestión de desafíos diarios y progreso del usuario.
+ * Controla la generación de retos, cálculo de XP, niveles y rachas de actividad.
+ * 
+ * @author eduglezexp
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -50,9 +56,8 @@ public class DailyChallengeService {
     // -------------------------------------------------------------------------
 
     /**
-     * Genera los desafios del dia si aun no existen.
-     * Se llama desde el controller al pedir los desafios de hoy,
-     * de forma que si no hay desafios generados (primer acceso del dia) se crean en ese momento.
+     * Genera los desafíos del día si aún no existen para el día actual.
+     * Se invoca automáticamente al solicitar los desafíos de hoy.
      */
     @Transactional
     public void generateTodayChallengesIfNeeded() {
@@ -64,15 +69,11 @@ public class DailyChallengeService {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Obtener desafios del dia para un usuario
-    // -------------------------------------------------------------------------
-
     /**
-     * Devuelve los desafios de hoy visibles para el usuario segun su nivel:
-     * - PRINCIPIANTE: solo desafios de nivel PRINCIPIANTE
-     * - INTERMEDIO:   solo desafios de nivel INTERMEDIO
-     * - AVANZADO:     solo desafios de nivel AVANZADO
+     * Devuelve los desafíos de hoy visibles para el usuario según su nivel de dificultad.
+     * 
+     * @param user Usuario que solicita los desafíos.
+     * @return Lista de desafíos diarios con su estado de completitud.
      */
     @Transactional
     public List<DailyChallengeDto> getTodayChallengesForUser(User user) {
@@ -91,10 +92,13 @@ public class DailyChallengeService {
         return result;
     }
 
-    // -------------------------------------------------------------------------
-    // Completar un desafio
-    // -------------------------------------------------------------------------
-
+    /**
+     * Marca un desafío como completado para el usuario actual, otorgando XP y actualizando rachas.
+     * 
+     * @param challengeId ID del desafío a completar.
+     * @param user Usuario que completa el desafío.
+     * @return Respuesta con XP ganado, nuevo nivel y estado de racha.
+     */
     @Transactional
     public CompleteChallengResponseDto completeChallenge(Long challengeId, User user) {
         DailyChallenge challenge = challengeRepo.findById(challengeId)
@@ -145,10 +149,12 @@ public class DailyChallengeService {
                 user.getStreak(), user.getBestStreak());
     }
 
-    // -------------------------------------------------------------------------
-    // Estadisticas
-    // -------------------------------------------------------------------------
-
+    /**
+     * Obtiene las estadísticas de progreso del usuario (XP, nivel, racha y calendario mensual).
+     * 
+     * @param user Usuario actual.
+     * @return DTO con estadísticas y fechas de actividad.
+     */
     @Transactional(readOnly = true)
     public StatsDto getStats(User user) {
         LocalDate today     = LocalDate.now();

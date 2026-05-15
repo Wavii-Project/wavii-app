@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -78,5 +79,32 @@ class JwtAuthFilterTest {
 
         verify(filterChain, times(1)).doFilter(request, response);
         assert SecurityContextHolder.getContext().getAuthentication() == null;
+    }
+
+    @Test
+    void doFilterInternalNonBearerHeaderSkipsFilterTest() throws Exception {
+        when(request.getHeader("Authorization")).thenReturn("Basic dXNlcjpwYXNz");
+
+        jwtAuthFilter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain, times(1)).doFilter(request, response);
+        verifyNoInteractions(jwtService);
+    }
+
+    @Test
+    void doFilterInternalTokenNotValidDoesNotSetAuthTest() throws Exception {
+        String token = "not_valid_token";
+        when(request.getHeader("Authorization")).thenReturn("Bearer " + token);
+        when(jwtService.extractEmail(token)).thenReturn("test@test.com");
+
+        User user = new User();
+        user.setEmail("test@test.com");
+        when(customUserDetailsService.loadUserByUsername("test@test.com")).thenReturn(user);
+        when(jwtService.isTokenValid(token, user)).thenReturn(false);
+
+        jwtAuthFilter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain, times(1)).doFilter(request, response);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
 }

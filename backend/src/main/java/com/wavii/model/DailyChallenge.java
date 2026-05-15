@@ -7,9 +7,9 @@ import lombok.*;
 import java.time.LocalDate;
 
 /**
- * Representa un desafio diario: una tablatura asignada como desafio para una fecha concreta.
- * Cada dia se generan hasta 4 desafios por nivel de dificultad a partir de las
- * tablaturas subidas por la comunidad (PdfDocument).
+ * Entidad que representa un desafío diario en la plataforma.
+ * Cada día se generan desafíos basados en tablaturas de la comunidad (PdfDocument)
+ * segmentados por nivel de dificultad y posición (slot).
  */
 @Entity
 @Table(

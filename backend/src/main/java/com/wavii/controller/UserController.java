@@ -26,6 +26,12 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
+/**
+ * Controlador REST para la gestión de perfiles de usuario.
+ * Proporciona endpoints para consultar, actualizar y gestionar la cuenta del usuario.
+ * 
+ * @author eduglezexp
+ */
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
@@ -44,6 +50,13 @@ public class UserController {
     private final StripeService stripeService;
     private final OdooService odooService;
 
+    /**
+     * Actualiza los datos del perfil del usuario actual (nombre y ciudad).
+     * 
+     * @param currentUser Usuario autenticado.
+     * @param body Mapa con los campos a actualizar.
+     * @return 200 OK con los datos actualizados o error de validación.
+     */
     @PatchMapping("/me")
     public ResponseEntity<?> updateMe(
             @AuthenticationPrincipal User currentUser,
@@ -89,6 +102,13 @@ public class UserController {
         ));
     }
 
+    /**
+     * Cambia la contraseña del usuario actual.
+     * 
+     * @param currentUser Usuario autenticado.
+     * @param req Datos con la contraseña actual y la nueva.
+     * @return 200 OK si se cambió correctamente.
+     */
     @PatchMapping("/me/password")
     public ResponseEntity<?> changePassword(
             @AuthenticationPrincipal User currentUser,
@@ -124,6 +144,12 @@ public class UserController {
         return ResponseEntity.ok(Map.of("message", "Contraseña actualizada correctamente"));
     }
 
+    /**
+     * Programa la eliminación de la cuenta del usuario actual (en 15 días).
+     * 
+     * @param currentUser Usuario autenticado.
+     * @return 200 OK con la fecha programada.
+     */
     @DeleteMapping("/me")
     public ResponseEntity<?> deleteMe(@AuthenticationPrincipal User currentUser) {
         try {
@@ -171,6 +197,12 @@ public class UserController {
         }
     }
 
+    /**
+     * Cancela la eliminación programada de la cuenta.
+     * 
+     * @param currentUser Usuario autenticado.
+     * @return 200 OK si se canceló correctamente.
+     */
     @PatchMapping("/me/deletion-cancel")
     public ResponseEntity<?> cancelDeletion(@AuthenticationPrincipal User currentUser) {
         if (currentUser.getDeletionScheduledAt() == null) {
@@ -203,7 +235,13 @@ public class UserController {
         return ResponseEntity.ok(Map.of("message", "La eliminacion de tu cuenta ha sido cancelada"));
     }
 
-    // ─── Validación de nombre único al actualizar nombre ─────────────────────
+    /**
+     * Comprueba si un nombre de usuario está disponible para actualización.
+     * 
+     * @param name Nombre a comprobar.
+     * @param currentUser Usuario autenticado.
+     * @return 200 OK con { taken: boolean }.
+     */
     @GetMapping("/me/check-name")
     public ResponseEntity<Map<String, Boolean>> checkNameForUpdate(
             @RequestParam String name,
@@ -214,8 +252,13 @@ public class UserController {
         return ResponseEntity.ok(Map.of("taken", taken));
     }
 
-    // ─── Perfiles públicos ────────────────────────────────────────────────────
-
+    /**
+     * Obtiene el perfil público de un usuario.
+     * 
+     * @param id ID del usuario.
+     * @param currentUser Usuario autenticado.
+     * @return Perfil público del usuario.
+     */
     @GetMapping("/{id}")
     public ResponseEntity<?> getPublicProfile(
             @PathVariable UUID id,
@@ -228,6 +271,13 @@ public class UserController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * Obtiene las tablaturas públicas de un usuario.
+     * 
+     * @param id ID del usuario.
+     * @param currentUser Usuario autenticado.
+     * @return Lista de tablaturas públicas.
+     */
     @GetMapping("/{id}/tabs")
     public ResponseEntity<List<PdfResponseDto>> getUserTabs(
             @PathVariable UUID id,
@@ -236,8 +286,14 @@ public class UserController {
         return ResponseEntity.ok(tabs);
     }
 
-    // ─── Reporte de usuario ───────────────────────────────────────────────────
-
+    /**
+     * Reporta a un usuario por una razón específica.
+     * 
+     * @param id ID del usuario reportado.
+     * @param body Mapa con el campo "reason".
+     * @param currentUser Usuario que reporta.
+     * @return 200 OK si se envió el reporte.
+     */
     @PostMapping("/{id}/report")
     public ResponseEntity<?> reportUser(
             @PathVariable UUID id,
@@ -257,8 +313,13 @@ public class UserController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    // ─── Bloqueo de usuario ───────────────────────────────────────────────────
-
+    /**
+     * Bloquea a un usuario.
+     * 
+     * @param id ID del usuario a bloquear.
+     * @param currentUser Usuario que bloquea.
+     * @return 200 OK si se bloqueó correctamente.
+     */
     @PostMapping("/{id}/block")
     public ResponseEntity<?> blockUser(
             @PathVariable UUID id,
@@ -277,6 +338,13 @@ public class UserController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * Desbloquea a un usuario.
+     * 
+     * @param id ID del usuario a desbloquear.
+     * @param currentUser Usuario que desbloquea.
+     * @return 200 OK si se desbloqueó correctamente.
+     */
     @DeleteMapping("/{id}/block")
     public ResponseEntity<?> unblockUser(
             @PathVariable UUID id,
@@ -289,8 +357,13 @@ public class UserController {
         return ResponseEntity.ok(Map.of("message", "Usuario desbloqueado"));
     }
 
-    // ─── Preferencia de mensajes ──────────────────────────────────────────────
-
+    /**
+     * Activa o desactiva la recepción de mensajes privados.
+     * 
+     * @param body Mapa con el campo "acceptsMessages".
+     * @param currentUser Usuario autenticado.
+     * @return 200 OK.
+     */
     @PatchMapping("/me/accepts-messages")
     public ResponseEntity<?> toggleAcceptsMessages(
             @RequestBody Map<String, Boolean> body,

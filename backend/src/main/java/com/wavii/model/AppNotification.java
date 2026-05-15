@@ -6,6 +6,10 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Entidad que representa una notificación interna enviada a un usuario.
+ * Contiene el título, cuerpo, tipo y datos adicionales en formato JSON.
+ */
 @Entity
 @Table(name = "app_notifications")
 @Data

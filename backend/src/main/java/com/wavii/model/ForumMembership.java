@@ -22,6 +22,10 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Entidad que vincula a un usuario con un foro.
+ * Define el rol del usuario en la comunidad (MEMBER, ADMIN, OWNER) y la fecha de unión.
+ */
 @Entity
 @Table(
         name = "forum_memberships",

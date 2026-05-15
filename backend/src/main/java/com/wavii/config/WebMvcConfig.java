@@ -8,6 +8,12 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+/**
+ * Configuración de recursos estáticos de Spring MVC.
+ * Permite servir archivos públicos (PDFs, imágenes de perfil, etc.) desde el sistema de archivos.
+ * 
+ * @author eduglezexp
+ */
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 

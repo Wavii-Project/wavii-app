@@ -34,6 +34,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Controlador REST para la gestión de foros y comunidades.
+ * 
+ * @author danielrguezh
+ */
 @RestController
 @RequestMapping("/api/forums")
 @RequiredArgsConstructor

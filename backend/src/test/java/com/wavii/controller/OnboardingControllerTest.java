@@ -106,4 +106,23 @@ class OnboardingControllerTest {
 
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, result.getStatusCode());
     }
+
+    @Test
+    void completeOnboardingNullLevelReturnsOkWithNullLevelTest() {
+        User user = new User();
+        CompleteOnboardingRequest request = new CompleteOnboardingRequest();
+
+        User updatedUser = mock(User.class);
+        when(updatedUser.isOnboardingCompleted()).thenReturn(true);
+        when(updatedUser.getRole()).thenReturn(Role.USUARIO);
+        when(updatedUser.getLevel()).thenReturn(null);
+
+        when(onboardingService.completeOnboarding(user, request)).thenReturn(updatedUser);
+
+        ResponseEntity<?> result = onboardingController.completeOnboarding(user, request);
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+        java.util.Map<?, ?> body = (java.util.Map<?, ?>) result.getBody();
+        org.junit.jupiter.api.Assertions.assertNull(body.get("level"));
+    }
 }

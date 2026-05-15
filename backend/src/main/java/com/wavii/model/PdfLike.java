@@ -5,6 +5,9 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+/**
+ * Entidad que representa un "me gusta" dado por un usuario a una tablatura PDF.
+ */
 @Entity
 @Table(name = "pdf_likes", uniqueConstraints = @UniqueConstraint(columnNames = {"pdf_id", "user_id"}))
 @Data

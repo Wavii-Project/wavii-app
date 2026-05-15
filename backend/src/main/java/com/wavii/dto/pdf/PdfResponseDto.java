@@ -5,6 +5,12 @@ import com.wavii.model.PdfDocument;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * DTO que representa la respuesta detallada de una tablatura PDF.
+ * Incluye metadatos, estado de "me gusta" del usuario y datos del propietario.
+ * 
+ * @author danielrguezh
+ */
 public record PdfResponseDto(
         Long id,
         String originalName,

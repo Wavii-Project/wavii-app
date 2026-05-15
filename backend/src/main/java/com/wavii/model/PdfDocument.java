@@ -5,6 +5,12 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+/**
+ * Entidad que representa una tablatura en formato PDF subida por un usuario.
+ * Contiene información sobre el archivo, metadatos musicales y estadísticas de interacción.
+ * 
+ * @author danielrguezh
+ */
 @Entity
 @Table(name = "pdf_documents")
 @Data

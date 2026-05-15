@@ -1,5 +1,8 @@
 package com.wavii.model.enums;
 
+/**
+ * Enum que lista los géneros musicales soportados en la plataforma.
+ */
 public enum MusicalGenre {
     ROCK,
     METAL,

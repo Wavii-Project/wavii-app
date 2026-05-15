@@ -8,9 +8,18 @@ import com.wavii.model.enums.ListingType;
 import com.wavii.model.enums.MusicalGenre;
 import com.wavii.model.enums.MusicianRole;
 import com.wavii.repository.BandListingRepository;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -318,5 +327,175 @@ class BandListingServiceTest {
 
         assertNotNull(result);
         assertTrue(result.isEmpty());
+    }
+
+    // ─── Specification predicate invocation ───────────────────────
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getListingsSpecPredicatesBuiltForGenreCityAndRoleTest() {
+        ArgumentCaptor<Specification<BandListing>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+
+        when(repository.findAll(specCaptor.capture(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        service.getListings("ROCK", "madrid", "GUITARRISTA", 0);
+
+        Specification<BandListing> captured = specCaptor.getValue();
+
+        Root<BandListing> root = mock(Root.class);
+        CriteriaQuery<?> cq = mock(CriteriaQuery.class);
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+
+        @SuppressWarnings("unchecked")
+        Path<Object> genrePath = mock(Path.class);
+        @SuppressWarnings("unchecked")
+        Path<Object> cityPath = mock(Path.class);
+        @SuppressWarnings("rawtypes")
+        Join rolesJoinRaw = mock(Join.class);
+        @SuppressWarnings("unchecked")
+        Expression<String> cityExpr = mock(Expression.class);
+        Predicate genrePred = mock(Predicate.class);
+        Predicate cityPred = mock(Predicate.class);
+        Predicate rolePred = mock(Predicate.class);
+        Predicate andPred = mock(Predicate.class);
+
+        doReturn(genrePath).when(root).get("genre");
+        doReturn(cityPath).when(root).get("city");
+        when(root.join("roles", JoinType.INNER)).thenReturn(rolesJoinRaw);
+        doReturn(cityExpr).when(cb).lower((Expression) cityPath);
+        when(cb.equal(genrePath, MusicalGenre.ROCK)).thenReturn(genrePred);
+        when(cb.like(cityExpr, "%madrid%")).thenReturn(cityPred);
+        when(cb.equal(rolesJoinRaw, MusicianRole.GUITARRISTA.name())).thenReturn(rolePred);
+        when(cb.and(any(Predicate[].class))).thenReturn(andPred);
+
+        Predicate result = captured.toPredicate(root, cq, cb);
+
+        assertNotNull(result);
+        verify(cb).equal(genrePath, MusicalGenre.ROCK);
+        verify(cb).like(cityExpr, "%madrid%");
+        verify(cb).equal(rolesJoinRaw, MusicianRole.GUITARRISTA.name());
+        verify(cq).distinct(true);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getListingsSpecPredicatesNullFiltersEmptyPredicatesTest() {
+        ArgumentCaptor<Specification<BandListing>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+
+        when(repository.findAll(specCaptor.capture(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        service.getListings(null, null, null, 0);
+
+        Specification<BandListing> captured = specCaptor.getValue();
+
+        Root<BandListing> root = mock(Root.class);
+        CriteriaQuery<?> cq = mock(CriteriaQuery.class);
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+        Predicate andPred = mock(Predicate.class);
+        when(cb.and(any(Predicate[].class))).thenReturn(andPred);
+
+        Predicate result = captured.toPredicate(root, cq, cb);
+
+        assertNotNull(result);
+        verify(cb, never()).equal(any(), any());
+        verify(cb, never()).like(any(Expression.class), anyString());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getListingsSpecPredicatesOnlyCityFilterTest() {
+        ArgumentCaptor<Specification<BandListing>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+
+        when(repository.findAll(specCaptor.capture(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        service.getListings(null, "barcelona", null, 0);
+
+        Specification<BandListing> captured = specCaptor.getValue();
+
+        Root<BandListing> root = mock(Root.class);
+        CriteriaQuery<?> cq = mock(CriteriaQuery.class);
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+
+        @SuppressWarnings("unchecked")
+        Path<Object> cityPath = mock(Path.class);
+        @SuppressWarnings("unchecked")
+        Expression<String> cityExpr = mock(Expression.class);
+        Predicate cityPred = mock(Predicate.class);
+        Predicate andPred = mock(Predicate.class);
+
+        doReturn(cityPath).when(root).get("city");
+        doReturn(cityExpr).when(cb).lower((Expression) cityPath);
+        when(cb.like(cityExpr, "%barcelona%")).thenReturn(cityPred);
+        when(cb.and(any(Predicate[].class))).thenReturn(andPred);
+
+        Predicate result = captured.toPredicate(root, cq, cb);
+
+        assertNotNull(result);
+        verify(cb).like(cityExpr, "%barcelona%");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getListingsSpecPredicatesOnlyGenreFilterTest() {
+        ArgumentCaptor<Specification<BandListing>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+
+        when(repository.findAll(specCaptor.capture(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        service.getListings("JAZZ", null, null, 0);
+
+        Specification<BandListing> captured = specCaptor.getValue();
+
+        Root<BandListing> root = mock(Root.class);
+        CriteriaQuery<?> cq = mock(CriteriaQuery.class);
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+
+        Path<Object> genrePath = mock(Path.class);
+        Predicate genrePred = mock(Predicate.class);
+        Predicate andPred = mock(Predicate.class);
+
+        when(root.get("genre")).thenReturn(genrePath);
+        when(cb.equal(genrePath, MusicalGenre.JAZZ)).thenReturn(genrePred);
+        when(cb.and(any(Predicate[].class))).thenReturn(andPred);
+
+        Predicate result = captured.toPredicate(root, cq, cb);
+
+        assertNotNull(result);
+        verify(cb).equal(genrePath, MusicalGenre.JAZZ);
+    }
+
+    // ─── normalizeUrl and safeImageUrls helpers ────────────────────
+
+    @Test
+    void createWithNonNullCoverImageUrlTrimsUrlTest() {
+        CreateBandListingRequest req = new CreateBandListingRequest(
+                "Title", "Desc", ListingType.BANDA_BUSCA_MUSICOS,
+                MusicalGenre.ROCK, "Madrid", List.of(MusicianRole.GUITARRISTA),
+                "contact@test.com", "  https://img.example.com/cover.jpg  ", List.of());
+
+        when(repository.save(any(BandListing.class))).thenReturn(listing);
+
+        BandListingResponse result = service.create(req, creator);
+
+        assertNotNull(result);
+        verify(repository).save(argThat(bl -> bl.getCoverImageUrl() != null));
+    }
+
+    @Test
+    void createWithBlankCoverImageUrlSavesNullTest() {
+        CreateBandListingRequest req = new CreateBandListingRequest(
+                "Title", "Desc", ListingType.BANDA_BUSCA_MUSICOS,
+                MusicalGenre.ROCK, "Madrid", List.of(MusicianRole.GUITARRISTA),
+                null, "   ", List.of("img1", "", "  img3  ", "img4extra"));
+
+        when(repository.save(any(BandListing.class))).thenReturn(listing);
+
+        BandListingResponse result = service.create(req, creator);
+
+        assertNotNull(result);
+        verify(repository).save(argThat(bl -> bl.getCoverImageUrl() == null));
     }
 }

@@ -6,6 +6,9 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Entidad que representa una publicación o anuncio de un profesor en su tablón.
+ */
 @Entity
 @Table(name = "class_posts")
 @Data

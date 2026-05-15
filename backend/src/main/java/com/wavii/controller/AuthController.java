@@ -16,6 +16,12 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+/**
+ * Controlador REST para operaciones de autenticación.
+ * Proporciona endpoints para registro, login, verificación de email y recuperación de contraseña.
+ * 
+ * @author eduglezexp
+ */
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -26,6 +32,17 @@ public class AuthController {
     private final EmailService emailService;
     private final UserRepository userRepository;
 
+/**
+     * Registra un usuario nuevo.
+     *
+     * Endpoint: POST /api/auth/register
+     * Recibe {@link RegisterRequest} con los datos de registro y delega el alta en {@link AuthService}.
+     * 
+     * Respuestas:
+     * - 201: Usuario creado correctamente.
+     * - 409: Conflicto (por ejemplo, email o nombre ya existente).
+     * - 500: Error interno del servidor.
+     */
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         try {
@@ -48,6 +65,17 @@ public class AuthController {
         }
     }
 
+/**
+     * Comprueba si un nombre de usuario está disponible.
+     *
+     * Endpoint: GET /api/auth/check-name?name=...
+     * Permite validar en el frontend si el nombre ya está en uso.
+     *
+     * @param name Nombre a comprobar.
+     * @param currentUser Usuario autenticado (opcional). Si el nombre coincide con el del propio usuario,
+     *                     se considera disponible.
+     * @return 200 OK con un JSON: { "taken": boolean }.
+     */
     @GetMapping("/check-name")
     public ResponseEntity<Map<String, Boolean>> checkName(
             @RequestParam String name,
@@ -58,6 +86,18 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("taken", taken));
     }
 
+/**
+     * Inicia sesión de un usuario.
+     *
+     * Endpoint: POST /api/auth/login
+     * Recibe {@link LoginRequest} y delega la autenticación en {@link AuthService}.
+     *
+     * Respuestas típicas:
+     * - 200: Login correcto.
+     * - 403: Email no verificado.
+     * - 401: Credenciales inválidas.
+     * - 500: Error interno del servidor.
+     */
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
         try {
@@ -76,6 +116,15 @@ public class AuthController {
         }
     }
 
+/**
+     * Genera un nuevo acceso a partir de un refresh token.
+     *
+     * Endpoint: POST /api/auth/refresh
+     * Respuestas:
+     * - 200: Token actualizado.
+     * - 401: Token inválido.
+     * - 500: Error interno del servidor.
+     */
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         try {
@@ -91,11 +140,22 @@ public class AuthController {
         }
     }
 
+    /**
+     * Cierra la sesión del usuario.
+     * 
+     * @return 200 OK con mensaje de éxito.
+     */
     @PostMapping("/logout")
     public ResponseEntity<?> logout() {
         return ResponseEntity.ok(Map.of("message", "Sesión cerrada correctamente"));
     }
 
+    /**
+     * Solicita el restablecimiento de contraseña.
+     * 
+     * @param request Datos con el email del usuario.
+     * @return 200 OK con mensaje informativo.
+     */
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         try {
@@ -110,6 +170,12 @@ public class AuthController {
         }
     }
 
+    /**
+     * Muestra el formulario HTML para restablecer la contraseña.
+     * 
+     * @param token Token de recuperación.
+     * @return HTML con el formulario.
+     */
     @GetMapping("/reset-password")
     public ResponseEntity<String> resetPasswordForm(@RequestParam String token) {
         String html = """
@@ -201,6 +267,12 @@ public class AuthController {
         return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(html);
     }
 
+    /**
+     * Procesa el cambio de contraseña tras el formulario de recuperación.
+     * 
+     * @param request Datos con el token y la nueva contraseña.
+     * @return 200 OK si se cambió correctamente.
+     */
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         try {
@@ -216,6 +288,12 @@ public class AuthController {
         }
     }
 
+    /**
+     * Verifica el email del usuario mediante un token.
+     * 
+     * @param token Token de verificación.
+     * @return HTML con el resultado de la verificación.
+     */
     @GetMapping("/verify-email")
     public ResponseEntity<String> verifyEmail(@RequestParam String token) {
         try {
@@ -371,12 +449,24 @@ public class AuthController {
         }
     }
 
+    /**
+     * Comprueba si el email de un usuario está verificado.
+     * 
+     * @param email Email a comprobar.
+     * @return 200 OK con { verified: boolean }.
+     */
     @GetMapping("/check-verification")
     public ResponseEntity<Map<String, Boolean>> checkVerification(@RequestParam String email) {
         boolean verified = authService.isEmailVerified(email);
         return ResponseEntity.ok(Map.of("verified", verified));
     }
 
+    /**
+     * Reenvía el email de verificación.
+     * 
+     * @param body Mapa que contiene el campo "email".
+     * @return 200 OK si se envió correctamente.
+     */
     @PostMapping("/resend-verification")
     public ResponseEntity<?> resendVerification(@RequestBody Map<String, String> body) {
         try {
@@ -400,6 +490,12 @@ public class AuthController {
     // Los endpoints verify-teacher-phone y confirm-teacher-phone han sido eliminados.
     // La verificación de profesor_particular ocurre automáticamente al verificar el email.
 
+    /**
+     * Endpoint de prueba para enviar un email.
+     * 
+     * @param to Destinatario del email.
+     * @return 200 OK si se envió correctamente.
+     */
     @GetMapping("/test-email")
     public ResponseEntity<?> testEmail(@RequestParam String to) {
         try {

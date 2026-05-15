@@ -16,6 +16,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Entidad que representa a un usuario en el sistema.
+ * Implementa UserDetails para la integración con Spring Security.
+ * 
+ * @author eduglezexp
+ */
 @Entity
 @Table(name = "users")
 @Data

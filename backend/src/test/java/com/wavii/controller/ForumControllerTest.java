@@ -2,11 +2,14 @@ package com.wavii.controller;
 
 import com.wavii.dto.forum.CreateForumRequest;
 import com.wavii.dto.forum.CreatePostRequest;
+import com.wavii.dto.forum.ForumMemberResponse;
 import com.wavii.dto.forum.ForumResponse;
 import com.wavii.dto.forum.ForumSummaryResponse;
 import com.wavii.dto.forum.PostResponse;
+import com.wavii.dto.forum.UpdateForumMemberRoleRequest;
 import com.wavii.model.User;
 import com.wavii.model.enums.ForumCategory;
+import com.wavii.model.enums.ForumMembershipRole;
 import com.wavii.service.ForumService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +21,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -239,5 +244,143 @@ class ForumControllerTest {
                 .thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN));
 
         assertThrows(ResponseStatusException.class, () -> controller.createPost(forumId, req, user));
+    }
+
+    // ─── likeForum ────────────────────────────────────────────────
+
+    @Test
+    void likeForumReturnsOkTest() {
+        when(forumService.likeForum(forumId, user)).thenReturn(forumResponse);
+
+        ResponseEntity<ForumResponse> result = controller.likeForum(forumId, user);
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+        assertEquals(forumResponse, result.getBody());
+    }
+
+    // ─── unlikeForum ─────────────────────────────────────────────
+
+    @Test
+    void unlikeForumReturnsOkTest() {
+        when(forumService.unlikeForum(forumId, user)).thenReturn(forumResponse);
+
+        ResponseEntity<ForumResponse> result = controller.unlikeForum(forumId, user);
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+        assertEquals(forumResponse, result.getBody());
+    }
+
+    // ─── getMembers ───────────────────────────────────────────────
+
+    @Test
+    void getMembersReturnsOkTest() {
+        ForumMemberResponse member = new ForumMemberResponse(
+                user.getId().toString(), "Test User", null, "MEMBER", "2024-01-01T00:00:00");
+        when(forumService.getMembers(forumId, user)).thenReturn(List.of(member));
+
+        ResponseEntity<?> result = controller.getMembers(forumId, user);
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+    }
+
+    // ─── updateMemberRole ─────────────────────────────────────────
+
+    @Test
+    void updateMemberRoleReturnsOkTest() {
+        UUID memberId = UUID.randomUUID();
+        UpdateForumMemberRoleRequest req = new UpdateForumMemberRoleRequest(ForumMembershipRole.ADMIN);
+        when(forumService.updateMemberRole(forumId, memberId, ForumMembershipRole.ADMIN, user))
+                .thenReturn(forumResponse);
+
+        ResponseEntity<ForumResponse> result = controller.updateMemberRole(forumId, memberId, req, user);
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+        verify(forumService).updateMemberRole(forumId, memberId, ForumMembershipRole.ADMIN, user);
+    }
+
+    // ─── removeMember ─────────────────────────────────────────────
+
+    @Test
+    void removeMemberReturns204Test() {
+        UUID memberId = UUID.randomUUID();
+        doNothing().when(forumService).removeMember(forumId, memberId, user);
+
+        ResponseEntity<Void> result = controller.removeMember(forumId, memberId, user);
+
+        assertEquals(HttpStatus.NO_CONTENT, result.getStatusCode());
+        verify(forumService).removeMember(forumId, memberId, user);
+    }
+
+    // ─── uploadForumImage ─────────────────────────────────────────
+
+    @Test
+    void uploadForumImageNullFileReturnsBadRequestTest() {
+        ReflectionTestUtils.setField(controller, "pdfStoragePath", "./uploads/pdfs");
+        ReflectionTestUtils.setField(controller, "appBaseUrl", "http://localhost:8080");
+
+        ResponseEntity<?> result = controller.uploadForumImage(null);
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+    }
+
+    @Test
+    void uploadForumImageEmptyFileReturnsBadRequestTest() {
+        ReflectionTestUtils.setField(controller, "pdfStoragePath", "./uploads/pdfs");
+        ReflectionTestUtils.setField(controller, "appBaseUrl", "http://localhost:8080");
+        MockMultipartFile file = new MockMultipartFile("file", new byte[0]);
+
+        ResponseEntity<?> result = controller.uploadForumImage(file);
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+    }
+
+    @Test
+    void uploadForumImageNonImageContentTypeReturnsBadRequestTest() {
+        ReflectionTestUtils.setField(controller, "pdfStoragePath", "./uploads/pdfs");
+        ReflectionTestUtils.setField(controller, "appBaseUrl", "http://localhost:8080");
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "doc.pdf", "application/pdf", "content".getBytes());
+
+        ResponseEntity<?> result = controller.uploadForumImage(file);
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+    }
+
+    @Test
+    void uploadForumImageNullContentTypeReturnsBadRequestTest() {
+        ReflectionTestUtils.setField(controller, "pdfStoragePath", "./uploads/pdfs");
+        ReflectionTestUtils.setField(controller, "appBaseUrl", "http://localhost:8080");
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "image.png", null, "content".getBytes());
+
+        ResponseEntity<?> result = controller.uploadForumImage(file);
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+    }
+
+    @Test
+    void uploadForumImageValidImageReturnsOkTest() {
+        ReflectionTestUtils.setField(controller, "pdfStoragePath",
+                System.getProperty("java.io.tmpdir") + "/pdfs");
+        ReflectionTestUtils.setField(controller, "appBaseUrl", "http://localhost:8080");
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "cover.png", "image/png", "image-data".getBytes());
+
+        ResponseEntity<?> result = controller.uploadForumImage(file);
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+    }
+
+    @Test
+    void uploadForumImageNoExtensionUsesDefaultJpgTest() {
+        ReflectionTestUtils.setField(controller, "pdfStoragePath",
+                System.getProperty("java.io.tmpdir") + "/pdfs");
+        ReflectionTestUtils.setField(controller, "appBaseUrl", "http://localhost:8080");
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "cover", "image/jpeg", "image-data".getBytes());
+
+        ResponseEntity<?> result = controller.uploadForumImage(file);
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
     }
 }

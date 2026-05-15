@@ -12,6 +12,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Reconciliador de suscripciones canceladas.
+ * Tarea programada que revisa periódicamente los usuarios cuyas suscripciones han expirado
+ * tras una cancelación y los devuelve al plan FREE.
+ * 
+ * @author eduglezexp
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j

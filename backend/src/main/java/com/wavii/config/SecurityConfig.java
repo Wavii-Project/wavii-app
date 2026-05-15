@@ -23,6 +23,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 
+/**
+ * Configuración de seguridad principal para la aplicación Wavii.
+ * Define las reglas de acceso, filtros JWT y la gestión de sesiones.
+ * 
+ * @author eduglezexp
+ */
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
@@ -31,6 +37,10 @@ public class SecurityConfig {
     private final @Lazy JwtAuthFilter jwtAuthFilter;
     private final CustomUserDetailsService customUserDetailsService;
 
+    /**
+     * Configura la cadena de filtros de seguridad (SecurityFilterChain).
+     * Define qué rutas son públicas y cuáles requieren autenticación o roles específicos.
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -79,6 +89,9 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * Define el proveedor de autenticación que utiliza el servicio de usuarios personalizado y BCrypt.
+     */
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
@@ -87,16 +100,25 @@ public class SecurityConfig {
         return provider;
     }
 
+    /**
+     * Bean para gestionar la autenticación en los controladores o servicios.
+     */
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
 
+    /**
+     * Bean para el cifrado de contraseñas mediante BCrypt.
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * Personalización para ignorar la seguridad en rutas específicas (ej. webhooks externos).
+     */
     @Bean
     public WebSecurityCustomizer webSecurityCustomizer() {
         return web -> web.ignoring().requestMatchers(

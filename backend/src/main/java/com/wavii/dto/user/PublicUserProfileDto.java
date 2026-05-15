@@ -6,8 +6,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 
 /**
- * DTO de perfil público que el backend devuelve cuando se consulta
- * GET /api/users/{id}. No expone datos privados (email, teléfono, etc.).
+ * DTO que representa el perfil público de un usuario.
+ * No expone datos sensibles como el email o el teléfono de contacto.
  */
 public record PublicUserProfileDto(
         UUID id,

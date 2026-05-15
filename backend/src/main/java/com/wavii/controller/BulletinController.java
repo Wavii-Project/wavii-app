@@ -42,6 +42,18 @@ public class BulletinController {
     @Value("${wavii.app.base-url:http://localhost:8080}")
     private String appBaseUrl;
 
+    /**
+     * Obtiene el listado de profesores para el tablón de anuncios.
+     * 
+     * @param currentUser Usuario autenticado.
+     * @param query Búsqueda por texto (nombre, bio, etc.).
+     * @param instrument Instrumento que imparte.
+     * @param role Rol (Certificado o Particular).
+     * @param modality Modalidad (Online, Presencial, Ambas).
+     * @param availability Disponibilidad horaria.
+     * @param city Ciudad para clases presenciales.
+     * @return Listado filtrado y paginado según el plan del usuario.
+     */
     @GetMapping
     @Transactional(readOnly = true)
     public ResponseEntity<BulletinBoardResponse> getTeachers(
@@ -52,7 +64,7 @@ public class BulletinController {
             @RequestParam(value = "modality", required = false) String modality,
             @RequestParam(value = "availability", required = false) String availability,
             @RequestParam(value = "city", required = false) String city) {
-
+// ... (omitted code for brevity, but I will replace the entire block)
         List<BulletinTeacherResponse> allTeachers = userRepository
                 .findByRoleIn(List.of(Role.PROFESOR_PARTICULAR, Role.PROFESOR_CERTIFICADO))
                 .stream()
@@ -85,6 +97,12 @@ public class BulletinController {
                 "scholar"));
     }
 
+    /**
+     * Obtiene el perfil público de un profesor.
+     * 
+     * @param teacherId ID del profesor.
+     * @return El perfil del profesor.
+     */
     @GetMapping("/{teacherId}")
     @Transactional(readOnly = true)
     public ResponseEntity<?> getTeacher(@PathVariable UUID teacherId) {
@@ -99,6 +117,13 @@ public class BulletinController {
         return ResponseEntity.ok(toResponse(teacher));
     }
 
+    /**
+     * Actualiza el perfil de profesor en el tablón.
+     * 
+     * @param currentUser Usuario autenticado.
+     * @param request Datos del perfil a actualizar.
+     * @return El perfil actualizado.
+     */
     @PostMapping
     public ResponseEntity<?> updateProfile(
             @AuthenticationPrincipal User currentUser,
@@ -161,9 +186,16 @@ public class BulletinController {
         return ResponseEntity.ok(toResponse(saved));
     }
 
+    /**
+     * Sube una imagen para el perfil del profesor (banner o fotos del lugar).
+     * 
+     * @param file Archivo de imagen.
+     * @param kind Tipo de imagen ("banner" o "place").
+     * @return URL de la imagen subida.
+     */
     @PostMapping("/images")
     public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file,
-                                        @RequestParam(value = "kind", required = false) String kind) {
+                                         @RequestParam(value = "kind", required = false) String kind) {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "El archivo no puede estar vacío"));
         }
@@ -192,6 +224,7 @@ public class BulletinController {
         }
     }
 
+    /** Convierte un usuario a su respuesta DTO para el tablón. */
     private BulletinTeacherResponse toResponse(User user) {
         return new BulletinTeacherResponse(
                 user.getId().toString(),
@@ -218,14 +251,17 @@ public class BulletinController {
                 user.getClassModality());
     }
 
+    /** Comprueba si el usuario tiene acceso completo al tablón (Plan Scholar). */
     private boolean hasScholarAccess(User user) {
         return user != null && user.getSubscription() == Subscription.EDUCATION;
     }
 
+    /** Comprueba si el usuario puede publicar en el tablón. */
     private boolean canPublish(User user) {
         return user != null && hasScholarAccess(user);
     }
 
+    /** Filtra por texto en varios campos del profesor. */
     private boolean matchesQuery(BulletinTeacherResponse teacher, String query) {
         if (isBlank(query)) return true;
         String q = query.trim().toLowerCase();
@@ -236,11 +272,13 @@ public class BulletinController {
                 || contains(teacher.province(), q);
     }
 
+    /** Filtra por instrumento. */
     private boolean matchesInstrument(BulletinTeacherResponse teacher, String instrument) {
         if (isBlank(instrument) || "Todos".equalsIgnoreCase(instrument)) return true;
         return contains(teacher.instrument(), instrument.trim().toLowerCase());
     }
 
+    /** Filtra por rol (Certificado/Particular). */
     private boolean matchesRole(BulletinTeacherResponse teacher, String role) {
         if (isBlank(role) || "Todos".equalsIgnoreCase(role)) return true;
         if ("Certificados".equalsIgnoreCase(role)) return "profesor_certificado".equalsIgnoreCase(teacher.role());
@@ -248,44 +286,53 @@ public class BulletinController {
         return teacher.role().equalsIgnoreCase(role.trim());
     }
 
+    /** Filtra por modalidad de clase. */
     private boolean matchesModality(BulletinTeacherResponse teacher, String modality) {
         if (isBlank(modality) || "Todos".equalsIgnoreCase(modality)) return true;
         return teacher.classModality() != null && teacher.classModality().equalsIgnoreCase(modality.trim());
     }
 
+    /** Filtra por disponibilidad horaria. */
     private boolean matchesAvailability(BulletinTeacherResponse teacher, String availability) {
         if (isBlank(availability) || "Todos".equalsIgnoreCase(availability)) return true;
         return teacher.availabilityPreference() != null
                 && teacher.availabilityPreference().equalsIgnoreCase(availability.trim());
     }
 
+    /** Filtra por ciudad. */
     private boolean matchesCity(BulletinTeacherResponse teacher, String city) {
         if (isBlank(city)) return true;
         return contains(teacher.city(), city.trim().toLowerCase());
     }
 
+    /** Comprueba si una cadena contiene otra (case-insensitive). */
     private boolean contains(String value, String query) {
         return value != null && value.toLowerCase().contains(query);
     }
 
+    /** Comprueba si una cadena es nula o vacía. */
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
 
+    /** Normaliza una cadena quitando espacios y devolviendo null si queda vacía. */
     private String normalize(String value) {
         if (value == null) return null;
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
     }
 
+    /** Valida el formato de un email. */
     private boolean isValidEmail(String value) {
         return value != null && value.trim().matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     }
 
+    /** Valida el formato de un número de teléfono. */
     private boolean isValidPhone(String value) {
         return value != null && value.trim().matches("^\\+?[0-9\\s-]{7,20}$");
     }
 
+    /** Filtra y limpia una lista de URLs de imágenes. */
     private List<String> safeImageUrls(List<String> urls) {
         if (urls == null) return new ArrayList<>();
         return urls.stream()
@@ -294,6 +341,7 @@ public class BulletinController {
                 .toList();
     }
 
+    /** Normaliza el valor de preferencia de disponibilidad. */
     private String normalizeAvailability(String value) {
         String normalized = normalize(value);
         if (normalized == null) {

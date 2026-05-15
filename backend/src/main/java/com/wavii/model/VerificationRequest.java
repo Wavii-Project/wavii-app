@@ -7,6 +7,10 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Entidad que representa una solicitud de verificación de profesor certificado.
+ * Almacena el estado de la solicitud y el documento acreditativo subido.
+ */
 @Entity
 @Table(name = "verification_requests")
 @Data

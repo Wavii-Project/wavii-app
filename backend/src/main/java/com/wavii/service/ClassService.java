@@ -53,6 +53,12 @@ public class ClassService {
     private final NotificationService notificationService;
     private final EmailService emailService;
 
+    /**
+     * Lista todas las clases (inscripciones) del alumno actual.
+     * 
+     * @param currentUser Usuario alumno.
+     * @return Lista de mapas con datos de inscripciones.
+     */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listClasses(User currentUser) {
         List<ClassEnrollment> enrollments = enrollmentRepository.findByStudentOrderByCreatedAtDesc(currentUser);
@@ -62,6 +68,12 @@ public class ClassService {
                 .toList();
     }
 
+    /**
+     * Obtiene una visión general de las clases, sesiones y noticias para un profesor.
+     * 
+     * @param currentUser Usuario profesor.
+     * @return Mapa con listas de clases, sesiones y noticias.
+     */
     @Transactional(readOnly = true)
     public Map<String, Object> getManageOverview(User currentUser) {
         if (!isTeacher(currentUser)) {
@@ -87,6 +99,13 @@ public class ClassService {
         );
     }
 
+    /**
+     * Inicia el proceso de pago para una hora de clase con un profesor.
+     * 
+     * @param teacherId ID del profesor.
+     * @param student Usuario alumno.
+     * @return Datos para completar el pago con Stripe.
+     */
     @Transactional
     public Map<String, Object> checkout(UUID teacherId, User student) throws Exception {
         if (student == null) {
@@ -144,6 +163,14 @@ public class ClassService {
         return response;
     }
 
+    /**
+     * Envía una solicitud de clase a un profesor sin pago previo.
+     * 
+     * @param teacherId ID del profesor.
+     * @param student Usuario alumno.
+     * @param body Datos con el mensaje, disponibilidad y modalidad solicitada.
+     * @return Datos de la solicitud creada.
+     */
     @Transactional
     public Map<String, Object> requestClass(UUID teacherId, User student, Map<String, String> body) {
         if (student == null) {
@@ -192,6 +219,13 @@ public class ClassService {
         return toEnrollmentMap(enrollment);
     }
 
+    /**
+     * Confirma el pago de una clase tras la transacción en Stripe.
+     * 
+     * @param enrollmentId ID de la clase.
+     * @param currentUser Usuario alumno.
+     * @return Datos actualizados de la clase.
+     */
     @Transactional
     public Map<String, Object> confirm(UUID enrollmentId, User currentUser) {
         ClassEnrollment enrollment = getEnrollment(enrollmentId);
@@ -229,6 +263,14 @@ public class ClassService {
         }
     }
 
+    /**
+     * Actualiza el estado de una solicitud (aceptar, rechazar, cancelar, completar).
+     * 
+     * @param enrollmentId ID de la solicitud.
+     * @param currentUser Usuario que realiza la acción.
+     * @param body Contiene el nuevo "status" y opcionalmente un "reason".
+     * @return Datos actualizados de la solicitud.
+     */
     @Transactional
     public Map<String, Object> updateStatus(UUID enrollmentId, User currentUser, Map<String, String> body) {
         ClassEnrollment enrollment = getEnrollment(enrollmentId);
@@ -265,6 +307,13 @@ public class ClassService {
         return toEnrollmentMap(enrollment);
     }
 
+    /**
+     * Obtiene todos los mensajes de chat de una clase.
+     * 
+     * @param enrollmentId ID de la clase.
+     * @param currentUser Usuario participante.
+     * @return Lista de mensajes.
+     */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getMessages(UUID enrollmentId, User currentUser) {
         ClassEnrollment enrollment = getEnrollment(enrollmentId);
@@ -276,6 +325,14 @@ public class ClassService {
                 .toList();
     }
 
+    /**
+     * Envía un mensaje de chat dentro de una clase.
+     * 
+     * @param enrollmentId ID de la clase.
+     * @param sender Usuario remitente.
+     * @param content Contenido del mensaje.
+     * @return Datos del mensaje enviado.
+     */
     @Transactional
     public Map<String, Object> sendMessage(UUID enrollmentId, User sender, String content) {
         ClassEnrollment enrollment = getEnrollment(enrollmentId);
@@ -295,6 +352,12 @@ public class ClassService {
         return toMessageMap(messageRepository.save(message));
     }
 
+    /**
+     * Obtiene las noticias publicadas por un profesor.
+     * 
+     * @param teacher Usuario profesor.
+     * @return Lista de noticias.
+     */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getPosts(User teacher) {
         if (!isTeacher(teacher)) {
@@ -305,6 +368,13 @@ public class ClassService {
                 .toList();
     }
 
+    /**
+     * Obtiene las noticias de un profesor para un espectador (alumno o él mismo).
+     * 
+     * @param viewer Usuario que consulta.
+     * @param teacherId ID del profesor.
+     * @return Lista de noticias si tiene permiso.
+     */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getPostsForViewer(User viewer, UUID teacherId) {
         User teacher = userRepository.findById(teacherId)
@@ -328,6 +398,12 @@ public class ClassService {
                 .toList();
     }
 
+    /**
+     * Obtiene las noticias de todos los profesores con los que el alumno tiene clases.
+     * 
+     * @param student Usuario alumno.
+     * @return Lista de noticias ordenadas por fecha.
+     */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getPostsForStudent(User student) {
         if (student == null) {
@@ -356,6 +432,14 @@ public class ClassService {
                 .toList();
     }
 
+    /**
+     * Crea una nueva noticia (post) en el muro del profesor.
+     * 
+     * @param teacher Usuario profesor.
+     * @param title Título de la noticia.
+     * @param content Contenido de la noticia.
+     * @return Datos de la noticia creada.
+     */
     @Transactional
     public Map<String, Object> createPost(User teacher, String title, String content) {
         if (!isTeacher(teacher)) {
@@ -376,6 +460,13 @@ public class ClassService {
         return toPostMap(saved);
     }
 
+    /**
+     * Solicita y paga una hora extra de clase.
+     * 
+     * @param enrollmentId ID de la inscripción actual.
+     * @param currentUser Usuario alumno.
+     * @return Datos del nuevo proceso de pago.
+     */
     @Transactional
     public Map<String, Object> requestExtraHour(UUID enrollmentId, User currentUser) throws Exception {
         ClassEnrollment enrollment = getEnrollment(enrollmentId);
@@ -383,6 +474,13 @@ public class ClassService {
         return checkout(enrollment.getTeacher().getId(), currentUser);
     }
 
+    /**
+     * Solicita el reembolso de una clase pagada y no completada.
+     * 
+     * @param enrollmentId ID de la clase.
+     * @param currentUser Usuario alumno.
+     * @return Datos actualizados tras el reembolso.
+     */
     @Transactional
     public Map<String, Object> requestRefund(UUID enrollmentId, User currentUser) {
         ClassEnrollment enrollment = getEnrollment(enrollmentId);
@@ -424,6 +522,14 @@ public class ClassService {
         return toEnrollmentMap(enrollment);
     }
 
+    /**
+     * Agenda una sesión específica (fecha, hora, duración) para una clase.
+     * 
+     * @param enrollmentId ID de la clase.
+     * @param currentUser Usuario profesor.
+     * @param body Datos de la sesión (scheduledAt, durationMinutes, meetingUrl, notes).
+     * @return Datos de la sesión creada.
+     */
     @Transactional
     public Map<String, Object> createSession(UUID enrollmentId, User currentUser, Map<String, String> body) {
         ClassEnrollment enrollment = getEnrollment(enrollmentId);
@@ -462,6 +568,14 @@ public class ClassService {
         return toSessionMap(session);
     }
 
+    /**
+     * Actualiza los datos de una sesión agendada.
+     * 
+     * @param sessionId ID de la sesión.
+     * @param currentUser Usuario profesor.
+     * @param body Datos a actualizar.
+     * @return Datos actualizados de la sesión.
+     */
     @Transactional
     public Map<String, Object> updateSession(UUID sessionId, User currentUser, Map<String, String> body) {
         ClassSession session = sessionRepository.findById(sessionId)
@@ -491,6 +605,14 @@ public class ClassService {
         return toSessionMap(session);
     }
 
+    /**
+     * Registra un reporte contra un profesor.
+     * 
+     * @param teacherId ID del profesor reportado.
+     * @param reporter Usuario que reporta.
+     * @param body Contiene "reason" y "details".
+     * @return ID del reporte creado.
+     */
     @Transactional
     public Map<String, Object> createTeacherReport(UUID teacherId, User reporter, Map<String, String> body) {
         User teacher = userRepository.findById(teacherId)
@@ -523,6 +645,7 @@ public class ClassService {
         );
     }
 
+    /** Valida que el usuario sea el profesor dueño de la clase. */
     public void ensureTeacherOwner(User teacher, User currentUser) {
         if (currentUser == null || !teacher.getId().equals(currentUser.getId())) {
             throw new IllegalArgumentException("No tienes permiso para gestionar esta clase");

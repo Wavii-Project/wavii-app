@@ -18,6 +18,10 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Entidad que representa un "me gusta" dado por un usuario a un foro.
+ * Incluye una restricción de unicidad para evitar duplicados.
+ */
 @Entity
 @Table(
         name = "forum_likes",

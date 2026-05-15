@@ -1,6 +1,8 @@
 package com.wavii.controller;
 
 import com.wavii.dto.auth.*;
+import com.wavii.model.User;
+import com.wavii.repository.UserRepository;
 import com.wavii.service.AuthService;
 import com.wavii.service.EmailService;
 import org.junit.jupiter.api.Test;
@@ -15,6 +17,8 @@ import org.springframework.security.authentication.BadCredentialsException;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -26,6 +30,9 @@ class AuthControllerTest {
 
     @Mock
     private EmailService emailService;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private AuthController authController;
@@ -253,5 +260,73 @@ class AuthControllerTest {
         doThrow(new RuntimeException("Error genérico")).when(emailService).sendTestEmail("test@test.com");
         ResponseEntity<?> result = authController.testEmail("test@test.com");
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, result.getStatusCode());
+    }
+
+    // ─── checkName ────────────────────────────────────────────────
+
+    @Test
+    void checkNameNotTakenReturnsFalseTest() {
+        when(userRepository.existsByNameIgnoreCase("NewName")).thenReturn(false);
+
+        ResponseEntity<Map<String, Boolean>> result = authController.checkName("NewName", null);
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+        assertNotNull(result.getBody());
+        assertEquals(false, result.getBody().get("taken"));
+    }
+
+    @Test
+    void checkNameTakenNoCurrentUserReturnsTrueTest() {
+        when(userRepository.existsByNameIgnoreCase("TakenName")).thenReturn(true);
+
+        ResponseEntity<Map<String, Boolean>> result = authController.checkName("TakenName", null);
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+        assertTrue(result.getBody().get("taken"));
+    }
+
+    @Test
+    void checkNameCurrentUserSameNameReturnsFalseTest() {
+        User currentUser = new User();
+        currentUser.setName("MyName");
+        when(userRepository.existsByNameIgnoreCase("MyName")).thenReturn(true);
+
+        ResponseEntity<Map<String, Boolean>> result = authController.checkName("MyName", currentUser);
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+        assertEquals(false, result.getBody().get("taken"));
+    }
+
+    // ─── checkVerification ────────────────────────────────────────
+
+    @Test
+    void checkVerificationVerifiedReturnsTrueTest() {
+        when(authService.isEmailVerified("test@test.com")).thenReturn(true);
+
+        ResponseEntity<Map<String, Boolean>> result = authController.checkVerification("test@test.com");
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+        assertTrue(result.getBody().get("verified"));
+    }
+
+    @Test
+    void checkVerificationNotVerifiedReturnsFalseTest() {
+        when(authService.isEmailVerified("test@test.com")).thenReturn(false);
+
+        ResponseEntity<Map<String, Boolean>> result = authController.checkVerification("test@test.com");
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+        assertEquals(false, result.getBody().get("verified"));
+    }
+
+    // ─── resetPasswordForm ────────────────────────────────────────
+
+    @Test
+    void resetPasswordFormReturnsHtmlTest() {
+        ResponseEntity<String> result = authController.resetPasswordForm("my-token");
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+        assertNotNull(result.getBody());
+        assertTrue(result.getBody().contains("my-token"));
     }
 }

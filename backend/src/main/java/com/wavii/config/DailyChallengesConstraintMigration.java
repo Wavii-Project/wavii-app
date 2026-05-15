@@ -13,6 +13,8 @@ import java.util.Map;
  * Corrige constraints antiguos de daily_challenges en despliegues ya existentes:
  * - elimina unique(challenge_date, difficulty)
  * - garantiza unique(challenge_date, difficulty, slot)
+ * 
+ * @author eduglezexp
  */
 @Component
 @RequiredArgsConstructor

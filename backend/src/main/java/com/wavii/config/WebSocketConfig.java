@@ -8,6 +8,12 @@ import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 
+/**
+ * Configuración de WebSockets para la comunicación en tiempo real.
+ * Registra los handlers para chats de clases y foros.
+ * 
+ * @author eduglezexp
+ */
 @Configuration
 @EnableWebSocket
 @RequiredArgsConstructor

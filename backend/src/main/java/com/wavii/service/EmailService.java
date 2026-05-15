@@ -10,6 +10,12 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+/**
+ * Servicio para el envío de correos electrónicos.
+ * Maneja el envío de verificaciones, recuperaciones de contraseña y notificaciones.
+ * 
+ * @author eduglezexp
+ */
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -23,6 +29,13 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
+    /**
+     * Envía un email para verificar la cuenta del usuario.
+     * 
+     * @param toEmail Email del destinatario.
+     * @param userName Nombre del usuario.
+     * @param token Token de verificación.
+     */
     @Async
     public void sendVerificationEmail(String toEmail, String userName, String token) {
         String verificationLink = baseUrl + "/api/auth/verify-email?token=" + token;
@@ -37,6 +50,13 @@ public class EmailService {
         sendHtmlEmail(toEmail, "✅ Verifica tu cuenta en Wavii", html);
     }
 
+    /**
+     * Envía un email para restablecer la contraseña del usuario.
+     * 
+     * @param toEmail Email del destinatario.
+     * @param userName Nombre del usuario.
+     * @param token Token de recuperación.
+     */
     @Async
     public void sendPasswordResetEmail(String toEmail, String userName, String token) {
         String resetLink = baseUrl + "/api/auth/reset-password?token=" + token;
@@ -51,6 +71,12 @@ public class EmailService {
         sendHtmlEmail(toEmail, "🔑 Restablece tu contraseña de Wavii", html);
     }
 
+    /**
+     * Envía un email informando que la verificación de profesor ha sido aprobada.
+     * 
+     * @param toEmail Email del destinatario.
+     * @param userName Nombre del usuario.
+     */
     @Async
     public void sendVerificationApprovedEmail(String toEmail, String userName) {
         String html = buildInfoHtml(
@@ -63,6 +89,12 @@ public class EmailService {
         sendHtmlEmail(toEmail, "Tu verificación ha sido aprobada — Wavii", html);
     }
 
+    /**
+     * Envía un email informando que la verificación de profesor ha sido rechazada.
+     * 
+     * @param toEmail Email del destinatario.
+     * @param userName Nombre del usuario.
+     */
     @Async
     public void sendVerificationRejectedEmail(String toEmail, String userName) {
         String html = buildInfoHtml(
@@ -76,6 +108,14 @@ public class EmailService {
         sendHtmlEmail(toEmail, "Sobre tu verificación en Wavii", html);
     }
 
+    /**
+     * Envía una notificación genérica relacionada con una clase por email.
+     * 
+     * @param toEmail Email del destinatario.
+     * @param userName Nombre del destinatario.
+     * @param title Título del mensaje.
+     * @param body Cuerpo del mensaje.
+     */
     @Async
     public void sendClassNotificationEmail(String toEmail, String userName, String title, String body) {
         String html = buildInfoHtml(
@@ -87,6 +127,11 @@ public class EmailService {
         sendHtmlEmail(toEmail, title + " - Wavii", html);
     }
 
+    /**
+     * Envía un email de prueba para validar la configuración SMTP.
+     * 
+     * @param to Email del destinatario.
+     */
     public void sendTestEmail(String to) {
         String html = buildHtml(
             "Test de SMTP — Wavii",

@@ -7,6 +7,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Entidad que representa la matriculación de un alumno con un profesor.
+ * Gestiona el seguimiento de horas compradas/usadas, pagos de Stripe y modalidad de clase.
+ */
 @Entity
 @Table(name = "class_enrollments")
 @Data

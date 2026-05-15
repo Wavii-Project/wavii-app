@@ -34,8 +34,13 @@ public class NewsService {
     private String baseUrl;
 
     /**
-     * Obtiene articulos de noticias de musica desde NewsData.io.
-     * Se cachean en memoria para no consumir creditos del plan gratuito (200/dia).
+     * Obtiene artículos de noticias musicales desde NewsData.io con sistema de caché.
+     * Si la búsqueda principal no devuelve resultados, intenta con términos alternativos.
+     * 
+     * @param query Término de búsqueda (ej. "guitarra", "rock").
+     * @param language Código de idioma (ej. "es", "en").
+     * @param size Cantidad máxima de artículos a recuperar.
+     * @return Lista de artículos de noticias encontrados.
      */
     @Cacheable(
             value = "news",

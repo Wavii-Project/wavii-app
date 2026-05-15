@@ -17,6 +17,13 @@ public class OnboardingService {
 
     private final UserRepository userRepository;
 
+    /**
+     * Completa el proceso de onboarding del usuario, actualizando su rol, nivel y avatar.
+     * 
+     * @param currentUser Usuario actual.
+     * @param request Datos del onboarding completado.
+     * @return El usuario actualizado.
+     */
     @Transactional
     public User completeOnboarding(User currentUser, CompleteOnboardingRequest request) {
         currentUser.setRole(request.getRole());
@@ -32,6 +39,11 @@ public class OnboardingService {
         return saved;
     }
 
+    /**
+     * Registra una solicitud de verificación para un profesor.
+     * 
+     * @param currentUser Usuario profesor solicitante.
+     */
     @Transactional
     public void submitTeacherVerification(User currentUser) {
         if (currentUser.getRole() != Role.PROFESOR_PARTICULAR
@@ -42,6 +54,12 @@ public class OnboardingService {
                 currentUser.getEmail(), currentUser.getRole());
     }
 
+    /**
+     * Obtiene el estado actual de la verificación de profesor para el usuario.
+     * 
+     * @param currentUser Usuario actual.
+     * @return Respuesta con el estado y mensaje explicativo.
+     */
     public VerificationStatusResponse getTeacherVerificationStatus(User currentUser) {
         String message;
         if (currentUser.isTeacherVerified()) {

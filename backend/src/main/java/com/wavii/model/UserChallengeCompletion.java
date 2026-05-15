@@ -8,8 +8,8 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * Registro de que un usuario completo un desafio diario concreto.
- * Tambien actua como registro historico de dias activos para el calendario de estadisticas.
+ * Entidad que registra la finalización de un desafío diario por parte de un usuario.
+ * Sirve como historial de actividad para el cálculo de estadísticas y rachas.
  */
 @Entity
 @Table(

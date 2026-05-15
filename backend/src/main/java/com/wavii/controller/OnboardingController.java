@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -23,6 +24,13 @@ public class OnboardingController {
 
     private final OnboardingService onboardingService;
 
+    /**
+     * Finaliza el proceso de onboarding para el usuario actual.
+     * 
+     * @param currentUser Usuario autenticado.
+     * @param request Datos del onboarding (intereses, instrumentos, nivel).
+     * @return 200 OK con el estado actualizado del usuario.
+     */
     @PostMapping("/complete")
     public ResponseEntity<?> completeOnboarding(
             @AuthenticationPrincipal User currentUser,
@@ -30,12 +38,12 @@ public class OnboardingController {
     ) {
         try {
             User updated = onboardingService.completeOnboarding(currentUser, request);
-            return ResponseEntity.ok(Map.of(
-                    "message", "Onboarding completado",
-                    "onboardingCompleted", updated.isOnboardingCompleted(),
-                    "role", updated.getRole().name(),
-                    "level", updated.getLevel() != null ? updated.getLevel().name() : null
-            ));
+            Map<String, Object> body = new HashMap<>();
+            body.put("message", "Onboarding completado");
+            body.put("onboardingCompleted", updated.isOnboardingCompleted());
+            body.put("role", updated.getRole().name());
+            body.put("level", updated.getLevel() != null ? updated.getLevel().name() : null);
+            return ResponseEntity.ok(body);
         } catch (Exception e) {
             log.error("Error completando onboarding", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -43,6 +51,12 @@ public class OnboardingController {
         }
     }
 
+    /**
+     * Envía una solicitud de verificación para el rol de profesor certificado.
+     * 
+     * @param currentUser Usuario autenticado.
+     * @return 200 OK si se envió la solicitud.
+     */
     @PostMapping("/teacher/submit-verification")
     public ResponseEntity<?> submitTeacherVerification(
             @AuthenticationPrincipal User currentUser
@@ -62,6 +76,12 @@ public class OnboardingController {
         }
     }
 
+    /**
+     * Obtiene el estado actual de la solicitud de verificación del profesor.
+     * 
+     * @param currentUser Usuario autenticado.
+     * @return 200 OK con el estado de verificación.
+     */
     @GetMapping("/teacher/verification-status")
     public ResponseEntity<?> getVerificationStatus(
             @AuthenticationPrincipal User currentUser

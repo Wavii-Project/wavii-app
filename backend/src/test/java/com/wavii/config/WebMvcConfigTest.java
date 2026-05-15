@@ -33,4 +33,21 @@ class WebMvcConfigTest {
         verify(registry).addResourceHandler("/uploads/**");
         verify(registration).addResourceLocations(anyString());
     }
+
+    @Test
+    void addResourceHandlersNullParentPathFallsBackToUploadsTest() throws Exception {
+        WebMvcConfig config = new WebMvcConfig();
+        Field field = WebMvcConfig.class.getDeclaredField("pdfStoragePath");
+        field.setAccessible(true);
+        field.set(config, "pdfs");
+
+        ResourceHandlerRegistry registry = mock(ResourceHandlerRegistry.class);
+        ResourceHandlerRegistration registration = mock(ResourceHandlerRegistration.class);
+
+        when(registry.addResourceHandler("/uploads/**")).thenReturn(registration);
+        when(registration.addResourceLocations(anyString())).thenReturn(registration);
+
+        assertDoesNotThrow(() -> config.addResourceHandlers(registry));
+        verify(registry).addResourceHandler("/uploads/**");
+    }
 }

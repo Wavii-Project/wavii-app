@@ -6,6 +6,10 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+/**
+ * DTO que representa una solicitud de registro de nuevo usuario.
+ * Incluye validaciones de formato para nombre, email y fortaleza de contraseña.
+ */
 @Data
 public class RegisterRequest {
 

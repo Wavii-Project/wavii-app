@@ -12,6 +12,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
+/**
+ * Controlador REST para la gestión de documentos PDF (tablaturas).
+ * Permite la subida, descarga, visualización y gestión de "me gusta" en las tablaturas.
+ * 
+ * @author danielrguezh
+ */
 @RestController
 @RequestMapping("/api/pdfs")
 @RequiredArgsConstructor

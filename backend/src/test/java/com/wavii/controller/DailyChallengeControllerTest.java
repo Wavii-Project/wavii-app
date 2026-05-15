@@ -6,6 +6,7 @@ import com.wavii.dto.challenge.StatsDto;
 import com.wavii.model.User;
 import com.wavii.model.enums.Level;
 import com.wavii.service.DailyChallengeService;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -141,5 +142,15 @@ class DailyChallengeControllerTest {
 
         assertEquals(HttpStatus.OK, result.getStatusCode());
         assertEquals(0, result.getBody().streak());
+    }
+
+    @Test
+    void completeChallengeDataIntegrityViolationReturns400Test() {
+        when(challengeService.completeChallenge(1L, user))
+                .thenThrow(new DataIntegrityViolationException("Duplicate"));
+
+        ResponseEntity<CompleteChallengResponseDto> result = controller.completeChallenge(1L, user);
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
     }
 }

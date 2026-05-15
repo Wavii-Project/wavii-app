@@ -6,6 +6,10 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Entidad que representa un token de verificación (email o reset de contraseña).
+ * Incluye la fecha de expiración y un indicador de si ya ha sido utilizado.
+ */
 @Entity
 @Table(name = "verification_tokens")
 @Data

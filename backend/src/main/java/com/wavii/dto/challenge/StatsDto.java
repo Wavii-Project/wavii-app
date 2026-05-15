@@ -4,8 +4,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * DTO de estadisticas del usuario para la pantalla de progreso.
- * Incluye los dias completados en el mes solicitado y los datos de racha.
+ * DTO que consolida las estadísticas de progreso de un usuario.
+ * Incluye racha actual, mejor racha histórica, XP acumulada, nivel y actividad mensual/semanal.
  */
 public record StatsDto(
         int streak,

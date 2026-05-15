@@ -2,21 +2,31 @@ package com.wavii.service;
 
 import com.wavii.dto.forum.CreateForumRequest;
 import com.wavii.dto.forum.CreatePostRequest;
+import com.wavii.dto.forum.ForumMemberResponse;
 import com.wavii.dto.forum.ForumResponse;
 import com.wavii.dto.forum.ForumSummaryResponse;
 import com.wavii.dto.forum.PostResponse;
 import com.wavii.model.Forum;
+import com.wavii.model.ForumLike;
 import com.wavii.model.ForumMembership;
 import com.wavii.model.ForumPost;
 import com.wavii.model.User;
 import com.wavii.model.enums.ForumCategory;
+import com.wavii.model.enums.ForumMembershipRole;
 import com.wavii.repository.ForumLikeRepository;
 import com.wavii.repository.ForumMembershipRepository;
 import com.wavii.repository.ForumPostRepository;
 import com.wavii.repository.ForumRepository;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -423,6 +433,511 @@ class ForumServiceTest {
         when(forumRepository.findById(unknownId)).thenReturn(Optional.empty());
 
         assertThrows(ResponseStatusException.class, () -> service.createPost(unknownId, req, user));
+    }
+
+    // ─── leaveForum with remaining members ───────────────────────
+
+    @Test
+    void leaveForumRemainingMembersWithOwnerSavesForumTest() {
+        User otherUser = new User();
+        otherUser.setId(UUID.randomUUID());
+        otherUser.setName("Other");
+
+        ForumMembership leavingMembership = ForumMembership.builder()
+                .forum(forum).user(user).role(ForumMembershipRole.MEMBER).build();
+
+        ForumMembership ownerMembership = ForumMembership.builder()
+                .forum(forum).user(otherUser).role(ForumMembershipRole.OWNER).build();
+        ownerMembership.setJoinedAt(java.time.LocalDateTime.now());
+
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.of(leavingMembership));
+        when(membershipRepository.findByForumOrderByJoinedAtAsc(forum)).thenReturn(List.of(ownerMembership));
+        when(forumRepository.save(any(Forum.class))).thenReturn(forum);
+
+        service.leaveForum(forumId, user);
+
+        verify(membershipRepository).delete(leavingMembership);
+        verify(forumRepository).save(forum);
+        verify(forumRepository, never()).delete(any(Forum.class));
+    }
+
+    @Test
+    void leaveForumRemainingMembersNoOwnerPromotesAdminTest() {
+        User adminUser = new User();
+        adminUser.setId(UUID.randomUUID());
+        adminUser.setName("Admin");
+        adminUser.setAvatarUrl(null);
+
+        ForumMembership leavingMembership = ForumMembership.builder()
+                .forum(forum).user(user).role(ForumMembershipRole.MEMBER).build();
+
+        ForumMembership adminMembership = ForumMembership.builder()
+                .forum(forum).user(adminUser).role(ForumMembershipRole.ADMIN).build();
+        adminMembership.setJoinedAt(java.time.LocalDateTime.now());
+
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.of(leavingMembership));
+        when(membershipRepository.findByForumOrderByJoinedAtAsc(forum)).thenReturn(List.of(adminMembership));
+        when(membershipRepository.save(any(ForumMembership.class))).thenReturn(adminMembership);
+        when(forumRepository.save(any(Forum.class))).thenReturn(forum);
+
+        service.leaveForum(forumId, user);
+
+        verify(membershipRepository).save(argThat(m -> m.getRole() == ForumMembershipRole.OWNER));
+    }
+
+    @Test
+    void leaveForumRemainingMembersNoOwnerNoAdminPromotesMemberTest() {
+        User memberUser = new User();
+        memberUser.setId(UUID.randomUUID());
+        memberUser.setName("Member");
+        memberUser.setAvatarUrl(null);
+
+        ForumMembership leavingMembership = ForumMembership.builder()
+                .forum(forum).user(user).role(ForumMembershipRole.MEMBER).build();
+
+        ForumMembership remainingMembership = ForumMembership.builder()
+                .forum(forum).user(memberUser).role(ForumMembershipRole.MEMBER).build();
+        remainingMembership.setJoinedAt(java.time.LocalDateTime.now());
+
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.of(leavingMembership));
+        when(membershipRepository.findByForumOrderByJoinedAtAsc(forum)).thenReturn(List.of(remainingMembership));
+        when(membershipRepository.save(any(ForumMembership.class))).thenReturn(remainingMembership);
+        when(forumRepository.save(any(Forum.class))).thenReturn(forum);
+
+        service.leaveForum(forumId, user);
+
+        verify(membershipRepository).save(argThat(m -> m.getRole() == ForumMembershipRole.OWNER));
+    }
+
+    // ─── getMembers ───────────────────────────────────────────────
+
+    @Test
+    void getMembersReturnsMemberListTest() {
+        ForumMembership membership = ForumMembership.builder()
+                .forum(forum).user(user).role(ForumMembershipRole.MEMBER).build();
+        membership.setJoinedAt(java.time.LocalDateTime.now());
+
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.of(membership));
+        when(membershipRepository.findByForumOrderByJoinedAtAsc(forum)).thenReturn(List.of(membership));
+
+        List<ForumMemberResponse> result = service.getMembers(forumId, user);
+
+        assertNotNull(result);
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    void getMembersNotMemberThrowsForbiddenTest() {
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.empty());
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.getMembers(forumId, user));
+        assertEquals(403, ex.getStatusCode().value());
+    }
+
+    @Test
+    void getMembersForumNotFoundThrowsTest() {
+        UUID unknownId = UUID.randomUUID();
+        when(forumRepository.findById(unknownId)).thenReturn(Optional.empty());
+
+        assertThrows(ResponseStatusException.class, () -> service.getMembers(unknownId, user));
+    }
+
+    // ─── likeForum ────────────────────────────────────────────────
+
+    @Test
+    void likeForumNotLikedSavesLikeTest() {
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(likeRepository.existsByForumAndUser(forum, user)).thenReturn(false);
+        when(membershipRepository.existsByForumAndUser(forum, user)).thenReturn(true);
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.empty());
+        when(membershipRepository.findByForumOrderByJoinedAtAsc(forum)).thenReturn(List.of());
+
+        ForumResponse result = service.likeForum(forumId, user);
+
+        assertNotNull(result);
+        verify(likeRepository).save(any(ForumLike.class));
+        verify(forumRepository).incrementLikeCount(forumId);
+    }
+
+    @Test
+    void likeForumAlreadyLikedSkipsTest() {
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(likeRepository.existsByForumAndUser(forum, user)).thenReturn(true);
+        when(membershipRepository.existsByForumAndUser(forum, user)).thenReturn(true);
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.empty());
+        when(membershipRepository.findByForumOrderByJoinedAtAsc(forum)).thenReturn(List.of());
+
+        ForumResponse result = service.likeForum(forumId, user);
+
+        assertNotNull(result);
+        verify(likeRepository, never()).save(any());
+        verify(forumRepository, never()).incrementLikeCount(any());
+    }
+
+    // ─── unlikeForum ──────────────────────────────────────────────
+
+    @Test
+    void unlikeForumHasLikeDeletesLikeTest() {
+        ForumLike like = ForumLike.builder().forum(forum).user(user).build();
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(likeRepository.findByForumAndUser(forum, user)).thenReturn(Optional.of(like));
+        when(membershipRepository.existsByForumAndUser(forum, user)).thenReturn(true);
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.empty());
+        when(membershipRepository.findByForumOrderByJoinedAtAsc(forum)).thenReturn(List.of());
+
+        ForumResponse result = service.unlikeForum(forumId, user);
+
+        assertNotNull(result);
+        verify(likeRepository).delete(like);
+        verify(forumRepository).decrementLikeCount(forumId);
+    }
+
+    @Test
+    void unlikeForumNoLikeDoesNothingTest() {
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(likeRepository.findByForumAndUser(forum, user)).thenReturn(Optional.empty());
+        when(membershipRepository.existsByForumAndUser(forum, user)).thenReturn(false);
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.empty());
+        when(membershipRepository.findByForumOrderByJoinedAtAsc(forum)).thenReturn(List.of());
+
+        ForumResponse result = service.unlikeForum(forumId, user);
+
+        assertNotNull(result);
+        verify(likeRepository, never()).delete(any());
+    }
+
+    // ─── updateMemberRole ─────────────────────────────────────────
+
+    @Test
+    void updateMemberRoleOwnerChangesRoleTest() {
+        User targetUser = new User();
+        targetUser.setId(UUID.randomUUID());
+        targetUser.setName("Target");
+        targetUser.setAvatarUrl(null);
+
+        ForumMembership ownerMembership = ForumMembership.builder()
+                .forum(forum).user(user).role(ForumMembershipRole.OWNER).build();
+        ownerMembership.setJoinedAt(java.time.LocalDateTime.now());
+
+        ForumMembership targetMembership = ForumMembership.builder()
+                .forum(forum).user(targetUser).role(ForumMembershipRole.MEMBER).build();
+        targetMembership.setJoinedAt(java.time.LocalDateTime.now());
+
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.of(ownerMembership));
+        when(membershipRepository.findByForumOrderByJoinedAtAsc(forum))
+                .thenReturn(List.of(ownerMembership, targetMembership));
+        when(membershipRepository.save(any(ForumMembership.class))).thenReturn(targetMembership);
+        when(likeRepository.existsByForumAndUser(forum, user)).thenReturn(false);
+
+        ForumResponse result = service.updateMemberRole(forumId, targetUser.getId(), ForumMembershipRole.ADMIN, user);
+
+        assertNotNull(result);
+        verify(membershipRepository).save(argThat(m -> m.getRole() == ForumMembershipRole.ADMIN));
+    }
+
+    @Test
+    void updateMemberRoleNotOwnerThrowsForbiddenTest() {
+        ForumMembership memberMembership = ForumMembership.builder()
+                .forum(forum).user(user).role(ForumMembershipRole.MEMBER).build();
+        memberMembership.setJoinedAt(java.time.LocalDateTime.now());
+
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.of(memberMembership));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.updateMemberRole(forumId, UUID.randomUUID(), ForumMembershipRole.ADMIN, user));
+        assertEquals(403, ex.getStatusCode().value());
+    }
+
+    @Test
+    void updateMemberRoleNullRoleThrowsBadRequestTest() {
+        ForumMembership ownerMembership = ForumMembership.builder()
+                .forum(forum).user(user).role(ForumMembershipRole.OWNER).build();
+        ownerMembership.setJoinedAt(java.time.LocalDateTime.now());
+
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.of(ownerMembership));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.updateMemberRole(forumId, UUID.randomUUID(), null, user));
+        assertEquals(400, ex.getStatusCode().value());
+    }
+
+    @Test
+    void updateMemberRoleOwnerRoleThrowsBadRequestTest() {
+        ForumMembership ownerMembership = ForumMembership.builder()
+                .forum(forum).user(user).role(ForumMembershipRole.OWNER).build();
+        ownerMembership.setJoinedAt(java.time.LocalDateTime.now());
+
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.of(ownerMembership));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.updateMemberRole(forumId, UUID.randomUUID(), ForumMembershipRole.OWNER, user));
+        assertEquals(400, ex.getStatusCode().value());
+    }
+
+    @Test
+    void updateMemberRoleTargetOwnerThrowsBadRequestTest() {
+        User ownerUser2 = new User();
+        ownerUser2.setId(UUID.randomUUID());
+        ownerUser2.setName("Owner2");
+        ownerUser2.setAvatarUrl(null);
+
+        ForumMembership ownerMembership = ForumMembership.builder()
+                .forum(forum).user(user).role(ForumMembershipRole.OWNER).build();
+        ownerMembership.setJoinedAt(java.time.LocalDateTime.now());
+
+        ForumMembership targetOwnerMembership = ForumMembership.builder()
+                .forum(forum).user(ownerUser2).role(ForumMembershipRole.OWNER).build();
+        targetOwnerMembership.setJoinedAt(java.time.LocalDateTime.now());
+
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.of(ownerMembership));
+        when(membershipRepository.findByForumOrderByJoinedAtAsc(forum))
+                .thenReturn(List.of(ownerMembership, targetOwnerMembership));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.updateMemberRole(forumId, ownerUser2.getId(), ForumMembershipRole.ADMIN, user));
+        assertEquals(400, ex.getStatusCode().value());
+    }
+
+    @Test
+    void updateMemberRoleTargetNotFoundThrowsNotFoundTest() {
+        ForumMembership ownerMembership = ForumMembership.builder()
+                .forum(forum).user(user).role(ForumMembershipRole.OWNER).build();
+        ownerMembership.setJoinedAt(java.time.LocalDateTime.now());
+
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.of(ownerMembership));
+        when(membershipRepository.findByForumOrderByJoinedAtAsc(forum)).thenReturn(List.of(ownerMembership));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.updateMemberRole(forumId, UUID.randomUUID(), ForumMembershipRole.ADMIN, user));
+        assertEquals(404, ex.getStatusCode().value());
+    }
+
+    // ─── removeMember ─────────────────────────────────────────────
+
+    @Test
+    void removeMemberAdminRemovesMemberTest() {
+        User memberUser = new User();
+        memberUser.setId(UUID.randomUUID());
+        memberUser.setName("Member");
+        memberUser.setAvatarUrl(null);
+
+        ForumMembership adminMembership = ForumMembership.builder()
+                .forum(forum).user(user).role(ForumMembershipRole.ADMIN).build();
+        adminMembership.setJoinedAt(java.time.LocalDateTime.now());
+
+        ForumMembership targetMembership = ForumMembership.builder()
+                .forum(forum).user(memberUser).role(ForumMembershipRole.MEMBER).build();
+        targetMembership.setJoinedAt(java.time.LocalDateTime.now());
+
+        // After removal, admin still owns the forum
+        ForumMembership ownerAfter = ForumMembership.builder()
+                .forum(forum).user(user).role(ForumMembershipRole.OWNER).build();
+        ownerAfter.setJoinedAt(java.time.LocalDateTime.now());
+
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.of(adminMembership));
+        when(membershipRepository.findByForumOrderByJoinedAtAsc(forum))
+                .thenReturn(List.of(adminMembership, targetMembership))
+                .thenReturn(List.of(ownerAfter));
+        when(forumRepository.save(any(Forum.class))).thenReturn(forum);
+
+        service.removeMember(forumId, memberUser.getId(), user);
+
+        verify(membershipRepository).delete(targetMembership);
+    }
+
+    @Test
+    void removeMemberMemberRoleThrowsForbiddenTest() {
+        ForumMembership memberMembership = ForumMembership.builder()
+                .forum(forum).user(user).role(ForumMembershipRole.MEMBER).build();
+        memberMembership.setJoinedAt(java.time.LocalDateTime.now());
+
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.of(memberMembership));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.removeMember(forumId, UUID.randomUUID(), user));
+        assertEquals(403, ex.getStatusCode().value());
+    }
+
+    @Test
+    void removeMemberTargetOwnerThrowsBadRequestTest() {
+        User ownerUser2 = new User();
+        ownerUser2.setId(UUID.randomUUID());
+        ownerUser2.setName("Owner2");
+        ownerUser2.setAvatarUrl(null);
+
+        ForumMembership adminMembership = ForumMembership.builder()
+                .forum(forum).user(user).role(ForumMembershipRole.ADMIN).build();
+        adminMembership.setJoinedAt(java.time.LocalDateTime.now());
+
+        ForumMembership ownerTarget = ForumMembership.builder()
+                .forum(forum).user(ownerUser2).role(ForumMembershipRole.OWNER).build();
+        ownerTarget.setJoinedAt(java.time.LocalDateTime.now());
+
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.of(adminMembership));
+        when(membershipRepository.findByForumOrderByJoinedAtAsc(forum))
+                .thenReturn(List.of(adminMembership, ownerTarget));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.removeMember(forumId, ownerUser2.getId(), user));
+        assertEquals(400, ex.getStatusCode().value());
+    }
+
+    @Test
+    void removeMemberTargetNotFoundThrowsNotFoundTest() {
+        ForumMembership adminMembership = ForumMembership.builder()
+                .forum(forum).user(user).role(ForumMembershipRole.ADMIN).build();
+        adminMembership.setJoinedAt(java.time.LocalDateTime.now());
+
+        when(forumRepository.findById(forumId)).thenReturn(Optional.of(forum));
+        when(membershipRepository.findByForumAndUser(forum, user)).thenReturn(Optional.of(adminMembership));
+        when(membershipRepository.findByForumOrderByJoinedAtAsc(forum)).thenReturn(List.of(adminMembership));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> service.removeMember(forumId, UUID.randomUUID(), user));
+        assertEquals(404, ex.getStatusCode().value());
+    }
+
+    // ─── getForums Specification predicate invocation ─────────────
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getForumsSpecPredicatesBuiltForSearchCityAndCategoryTest() {
+        ArgumentCaptor<Specification<Forum>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+
+        when(forumRepository.findAll(specCaptor.capture(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        service.getForums("jazz", "madrid", "GENERAL", "NEWEST", null);
+
+        Specification<Forum> captured = specCaptor.getValue();
+
+        Root<Forum> root = mock(Root.class);
+        CriteriaQuery<?> cq = mock(CriteriaQuery.class);
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+
+        @SuppressWarnings("unchecked")
+        Path<Object> namePath = mock(Path.class);
+        @SuppressWarnings("unchecked")
+        Path<Object> cityPath = mock(Path.class);
+        Path<Object> categoryPath = mock(Path.class);
+        @SuppressWarnings("unchecked")
+        Expression<String> nameExpr = mock(Expression.class);
+        @SuppressWarnings("unchecked")
+        Expression<String> cityExpr = mock(Expression.class);
+        Predicate namePred = mock(Predicate.class);
+        Predicate cityPred = mock(Predicate.class);
+        Predicate catPred = mock(Predicate.class);
+        Predicate andPred = mock(Predicate.class);
+
+        doReturn(namePath).when(root).get("name");
+        doReturn(cityPath).when(root).get("city");
+        doReturn(categoryPath).when(root).get("category");
+        doReturn(nameExpr).when(cb).lower((Expression) namePath);
+        doReturn(cityExpr).when(cb).lower((Expression) cityPath);
+        when(cb.like(nameExpr, "%jazz%")).thenReturn(namePred);
+        when(cb.like(cityExpr, "%madrid%")).thenReturn(cityPred);
+        when(cb.equal(categoryPath, ForumCategory.GENERAL)).thenReturn(catPred);
+        when(cb.and(any(Predicate[].class))).thenReturn(andPred);
+
+        Predicate result = captured.toPredicate(root, cq, cb);
+
+        assertNotNull(result);
+        verify(cb).like(nameExpr, "%jazz%");
+        verify(cb).like(cityExpr, "%madrid%");
+        verify(cb).equal(categoryPath, ForumCategory.GENERAL);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getForumsSpecPredicatesNullSearchNullCityNullCategoryTest() {
+        ArgumentCaptor<Specification<Forum>> specCaptor = ArgumentCaptor.forClass(Specification.class);
+
+        when(forumRepository.findAll(specCaptor.capture(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        service.getForums(null, null, null, null, null);
+
+        Specification<Forum> captured = specCaptor.getValue();
+
+        Root<Forum> root = mock(Root.class);
+        CriteriaQuery<?> cq = mock(CriteriaQuery.class);
+        CriteriaBuilder cb = mock(CriteriaBuilder.class);
+        Predicate andPred = mock(Predicate.class);
+        when(cb.and(any(Predicate[].class))).thenReturn(andPred);
+
+        Predicate result = captured.toPredicate(root, cq, cb);
+
+        assertNotNull(result);
+        verify(cb, never()).like(any(Expression.class), anyString());
+        verify(cb, never()).equal(any(), any());
+    }
+
+    // ─── getForums sort options ────────────────────────────────────
+
+    @Test
+    void getForumsWithSortNewestTest() {
+        when(forumRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        List<ForumSummaryResponse> result = service.getForums(null, null, null, "NEWEST", null);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void getForumsWithSortOldestTest() {
+        when(forumRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        List<ForumSummaryResponse> result = service.getForums(null, null, null, "OLDEST", null);
+
+        assertNotNull(result);
+    }
+
+    @Test
+    void getForumsWithSortLeastLikedTest() {
+        when(forumRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        List<ForumSummaryResponse> result = service.getForums(null, null, null, "LEAST_LIKED", null);
+
+        assertNotNull(result);
+    }
+
+    @Test
+    void getForumsWithInvalidSortDefaultsToMostLikedTest() {
+        when(forumRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        List<ForumSummaryResponse> result = service.getForums(null, null, null, "INVALID_SORT", null);
+
+        assertNotNull(result);
+    }
+
+    @Test
+    void getForumsWithInvalidCategoryTreatsAsNullTest() {
+        when(forumRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        List<ForumSummaryResponse> result = service.getForums(null, null, "INVALID_CATEGORY", null, null);
+
+        assertNotNull(result);
     }
 
     // ─── helpers ─────────────────────────────────────────────────

@@ -17,6 +17,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Servicio de integración con Odoo ERP mediante JSON-RPC.
+ * Gestiona la sincronización de clientes, facturación y tareas de proyectos.
+ * 
+ * @author eduglezexp
+ */
 @Service
 @Slf4j
 @SuppressWarnings({"rawtypes", "unchecked"})
@@ -41,15 +47,19 @@ public class OdooService {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
+    /**
+     * Comprueba si el servicio de Odoo está configurado correctamente con los parámetros del entorno.
+     * 
+     * @return true si la configuración mínima está presente.
+     */
     public boolean isConfigured() {
         return odooUrl != null && !odooUrl.isBlank()
                 && odooDb != null && !odooDb.isBlank()
                 && odooUser != null && !odooUser.isBlank();
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Capa de transporte JSON-RPC
-    // ─────────────────────────────────────────────────────────────
+
+    // ── Capa de transporte JSON-RPC ──
 
     /** Llamada genérica al endpoint /jsonrpc de Odoo. Usa raw List para datos heterogéneos. */
     private Object callRpc(String service, String method, List args) throws Exception {
@@ -102,9 +112,7 @@ public class OdooService {
         return executeKw(uid, model, method, args, Map.of());
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Helpers de modelo Odoo
-    // ─────────────────────────────────────────────────────────────
+    // ── Helpers de modelo Odoo ──
 
     /** Busca registros por dominio y devuelve sus IDs. */
     private List<Integer> search(int uid, String model, List domain) throws Exception {
@@ -128,9 +136,7 @@ public class OdooService {
         return ((Number) result).intValue();
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Autenticación
-    // ─────────────────────────────────────────────────────────────
+    // ── Autenticación ──
 
     private int authenticate() throws Exception {
         List args = new ArrayList();
@@ -145,13 +151,18 @@ public class OdooService {
         return ((Number) result).intValue();
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Operaciones de negocio
-    // ─────────────────────────────────────────────────────────────
+    // ── Verificaciones ──
+
+    private static final String VERIFICATION_PROJECT = "Verificaciones Wavii";
 
     /**
-     * Busca un cliente en res.partner por email.
-     * Si no existe, lo crea. Devuelve el partnerId.
+     * Busca un partner (cliente) en Odoo por su email o lo crea si no existe.
+     * 
+     * @param email Email del cliente.
+     * @param name Nombre del cliente.
+     * @param uid ID de usuario autenticado en Odoo.
+     * @return ID del partner en Odoo.
+     * @throws Exception Si falla la comunicación con Odoo.
      */
     public int findOrCreatePartner(String email, String name, int uid) throws Exception {
         List condition = Arrays.asList("email", "=", email);
@@ -173,8 +184,15 @@ public class OdooService {
     }
 
     /**
-     * Crea una factura (account.move) y la confirma (estado 'posted').
-     * Devuelve el ID de la factura.
+     * Crea una factura de cliente en Odoo y la confirma automáticamente.
+     * 
+     * @param partnerId ID del cliente.
+     * @param planName Nombre del concepto o plan.
+     * @param amount Importe de la factura.
+     * @param currency Moneda (ej. "EUR").
+     * @param uid ID de usuario de Odoo.
+     * @return ID de la factura creada.
+     * @throws Exception Si falla la comunicación con Odoo.
      */
     public int createInvoice(int partnerId, String planName, double amount,
                               String currency, int uid) throws Exception {
@@ -215,8 +233,13 @@ public class OdooService {
     }
 
     /**
-     * Registra el pago de una factura en Odoo.
-     * Usa el asistente oficial de registro de pago para dejarla conciliada.
+     * Registra un pago para una factura existente en Odoo mediante el asistente de pago.
+     * 
+     * @param invoiceId ID de la factura.
+     * @param partnerId ID del cliente.
+     * @param amount Importe pagado.
+     * @param uid ID de usuario de Odoo.
+     * @throws Exception Si falla la comunicación con Odoo.
      */
     public void registerPayment(int invoiceId, int partnerId, double amount, int uid) throws Exception {
         List journalCondition = Arrays.asList("type", "in", Arrays.asList("bank", "cash"));
@@ -271,10 +294,14 @@ public class OdooService {
         log.debug("Odoo: pago registrado y conciliado para factura id={} mediante wizard id={}", invoiceId, wizardId);
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // CRM — crear contacto al verificar email
-    // ─────────────────────────────────────────────────────────────
-
+    /**
+     * Crea un contacto en el CRM de Odoo de forma asíncrona tras la verificación de email.
+     * 
+     * @param name Nombre del contacto.
+     * @param email Email del contacto.
+     * @param role Rol asignado en Wavii.
+     * @param subscription Plan de suscripción actual.
+     */
     @Async
     public void createCrmContact(String name, String email, String role, String subscription) {
         if (!isConfigured()) {
@@ -306,12 +333,14 @@ public class OdooService {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Verificaciones — crear tarea en Odoo Project
-    // ─────────────────────────────────────────────────────────────
-
-    private static final String VERIFICATION_PROJECT = "Verificaciones Wavii";
-
+    /**
+     * Crea una tarea de verificación en el proyecto correspondiente de Odoo.
+     * 
+     * @param userName Nombre del usuario profesor.
+     * @param email Email del usuario.
+     * @param fileName Nombre del archivo subido.
+     * @param documentUrl URL para visualizar el documento.
+     */
     @Async
     public void createVerificationTask(String userName, String email, String fileName, String documentUrl) {
         if (!isConfigured()) {
@@ -351,6 +380,14 @@ public class OdooService {
         }
     }
 
+    /**
+     * Crea una tarea de gestión de suscripción en el proyecto correspondiente de Odoo.
+     * 
+     * @param userName Nombre del usuario.
+     * @param email Email del usuario.
+     * @param title Título de la tarea.
+     * @param description Descripción detallada.
+     */
     @Async
     public void createSubscriptionTask(String userName, String email, String title, String description) {
         if (!isConfigured()) {
@@ -384,14 +421,13 @@ public class OdooService {
         }
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Punto de entrada — llamado desde el webhook de Stripe
-    // ─────────────────────────────────────────────────────────────
-
     /**
-     * Orquesta la creación de factura y registro de pago en Odoo.
-     * @Async garantiza que no bloquea la respuesta al webhook de Stripe (límite 30s).
-     * Si Odoo falla, el error se loguea pero no afecta al pago ya procesado.
+     * Procesa un pago de Stripe de forma asíncrona: crea partner, factura y registra el pago en Odoo.
+     * 
+     * @param customerEmail Email del cliente.
+     * @param customerName Nombre del cliente.
+     * @param planName Nombre del plan suscrito.
+     * @param amount Importe pagado.
      */
     @Async
     public void processStripePayment(String customerEmail, String customerName,
@@ -412,6 +448,17 @@ public class OdooService {
         }
     }
 
+    /**
+     * Procesa el pago de una clase particular en Odoo.
+     * 
+     * @param studentEmail Email del alumno.
+     * @param studentName Nombre del alumno.
+     * @param teacherName Nombre del profesor.
+     * @param instrument Instrumento de la clase.
+     * @param modality Modalidad de la clase.
+     * @param city Ciudad de la clase.
+     * @param amount Importe pagado.
+     */
     @Async
     public void processClassPayment(String studentEmail, String studentName,
                                     String teacherName, String instrument,
@@ -433,6 +480,15 @@ public class OdooService {
             log.error("Odoo: error procesando pago de clase para {}: {}", studentEmail, e.getMessage());
         }
     }
+
+    /**
+     * Procesa el reembolso de una clase particular en Odoo.
+     * 
+     * @param studentEmail Email del alumno.
+     * @param studentName Nombre del alumno.
+     * @param teacherName Nombre del profesor.
+     * @param amount Importe reembolsado.
+     */
     @Async
     public void processClassRefund(String studentEmail, String studentName,
                                    String teacherName, double amount) {

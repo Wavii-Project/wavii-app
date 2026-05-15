@@ -8,14 +8,24 @@ import com.wavii.dto.auth.RegisterRequest;
 import com.wavii.dto.auth.ResetPasswordRequest;
 import com.wavii.dto.bulletin.BulletinTeacherResponse;
 import com.wavii.dto.bulletin.BulletinUpdateRequest;
+import com.wavii.dto.challenge.DailyChallengeDto;
+import com.wavii.dto.forum.ForumMemberResponse;
+import com.wavii.dto.forum.UpdateForumMemberRoleRequest;
 import com.wavii.dto.onboarding.CompleteOnboardingRequest;
 import com.wavii.dto.onboarding.VerificationStatusResponse;
+import com.wavii.dto.user.PublicUserProfileDto;
+import com.wavii.model.DailyChallenge;
+import com.wavii.model.PdfDocument;
+import com.wavii.model.User;
+import com.wavii.model.enums.ForumMembershipRole;
 import com.wavii.model.enums.Level;
 import com.wavii.model.enums.Role;
 import com.wavii.model.enums.Subscription;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -167,5 +177,133 @@ class DtoTest {
 
         assertTrue(response.isTeacherVerified());
         assertEquals("Verificado correctamente", response.getMessage());
+    }
+
+    // ─── ForumMemberResponse ──────────────────────────────────────
+
+    @Test
+    void forumMemberResponseRecordAccessorsTest() {
+        ForumMemberResponse response = new ForumMemberResponse(
+                "user-id-123", "Ana Garcia", "http://avatar.png", "MEMBER", "2024-01-01T00:00:00");
+        assertEquals("user-id-123", response.userId());
+        assertEquals("Ana Garcia", response.name());
+        assertEquals("http://avatar.png", response.avatarUrl());
+        assertEquals("MEMBER", response.role());
+        assertEquals("2024-01-01T00:00:00", response.joinedAt());
+    }
+
+    @Test
+    void forumMemberResponseNullFieldsTest() {
+        ForumMemberResponse response = new ForumMemberResponse("id", "Name", null, "MEMBER", null);
+        assertNull(response.avatarUrl());
+        assertNull(response.joinedAt());
+    }
+
+    // ─── UpdateForumMemberRoleRequest ─────────────────────────────
+
+    @Test
+    void updateForumMemberRoleRequestRecordAccessorTest() {
+        UpdateForumMemberRoleRequest request = new UpdateForumMemberRoleRequest(ForumMembershipRole.ADMIN);
+        assertEquals(ForumMembershipRole.ADMIN, request.role());
+    }
+
+    // ─── PublicUserProfileDto ─────────────────────────────────────
+
+    @Test
+    void publicUserProfileDtoFromWithAllFieldsTest() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Ana")
+                .level(Level.AVANZADO)
+                .role(Role.PROFESOR_PARTICULAR)
+                .xp(500)
+                .streak(10)
+                .createdAt(LocalDateTime.of(2024, 5, 15, 10, 0))
+                .build();
+
+        PublicUserProfileDto dto = PublicUserProfileDto.from(user, 3);
+
+        assertEquals(user.getId(), dto.id());
+        assertEquals("Ana", dto.name());
+        assertEquals("AVANZADO", dto.level());
+        assertEquals("PROFESOR_PARTICULAR", dto.role());
+        assertEquals(500, dto.xp());
+        assertEquals(10, dto.streak());
+        assertEquals(3, dto.tabsPublished());
+        assertEquals("2024-05", dto.memberSince());
+    }
+
+    @Test
+    void publicUserProfileDtoFromWithNullLevelAndRoleTest() {
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .name("Juan")
+                .level(null)
+                .role(null)
+                .xp(0)
+                .streak(0)
+                .createdAt(null)
+                .build();
+
+        PublicUserProfileDto dto = PublicUserProfileDto.from(user, 0);
+
+        assertNull(dto.level());
+        assertNull(dto.role());
+        assertNull(dto.memberSince());
+    }
+
+    // ─── DailyChallengeDto ────────────────────────────────────────
+
+    @Test
+    void dailyChallengeDtoFromWithOwnerAndCoverTest() {
+        User owner = User.builder().name("Prof. Ana").build();
+        PdfDocument pdf = PdfDocument.builder()
+                .id(42L)
+                .songTitle("Clair de Lune")
+                .description("Classic piece")
+                .coverImagePath("covers/cover.png")
+                .owner(owner)
+                .build();
+        DailyChallenge challenge = DailyChallenge.builder()
+                .id(1L)
+                .challengeDate(LocalDate.of(2024, 1, 1))
+                .difficulty(Level.INTERMEDIO)
+                .xpReward(25)
+                .pdfDocument(pdf)
+                .build();
+
+        DailyChallengeDto dto = DailyChallengeDto.from(challenge, true);
+
+        assertEquals(1L, dto.id());
+        assertEquals(Level.INTERMEDIO, dto.difficulty());
+        assertEquals(25, dto.xpReward());
+        assertEquals("Clair de Lune", dto.tabTitle());
+        assertEquals("Prof. Ana", dto.tabOwnerName());
+        assertTrue(dto.tabCoverImageUrl().contains("covers/cover.png"));
+        assertTrue(dto.completedByMe());
+    }
+
+    @Test
+    void dailyChallengeDtoFromWithNullOwnerAndNullCoverTest() {
+        PdfDocument pdf = PdfDocument.builder()
+                .id(10L)
+                .songTitle("Song")
+                .description("Desc")
+                .coverImagePath(null)
+                .owner(null)
+                .build();
+        DailyChallenge challenge = DailyChallenge.builder()
+                .id(2L)
+                .challengeDate(LocalDate.of(2024, 6, 1))
+                .difficulty(Level.PRINCIPIANTE)
+                .xpReward(15)
+                .pdfDocument(pdf)
+                .build();
+
+        DailyChallengeDto dto = DailyChallengeDto.from(challenge, false);
+
+        assertNull(dto.tabOwnerName());
+        assertNull(dto.tabCoverImageUrl());
+        assertFalse(dto.completedByMe());
     }
 }

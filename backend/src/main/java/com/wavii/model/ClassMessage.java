@@ -6,6 +6,10 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Entidad que representa un mensaje de chat dentro de una matriculación de clase.
+ * Permite la comunicación privada entre profesor y alumno.
+ */
 @Entity
 @Table(name = "class_messages")
 @Data

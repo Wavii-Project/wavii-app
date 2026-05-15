@@ -6,6 +6,10 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+/**
+ * Entidad que representa una sesión de clase individual (clase particular).
+ * Contiene la fecha, duración, estado y enlace de la reunión.
+ */
 @Entity
 @Table(name = "class_sessions")
 @Data

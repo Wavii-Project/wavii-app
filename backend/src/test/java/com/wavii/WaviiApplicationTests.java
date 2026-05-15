@@ -1,44 +1,31 @@
 package com.wavii;
 
-import com.wavii.config.CustomUserDetailsService;
-import com.wavii.config.JwtAuthFilter;
-import com.wavii.repository.UserRepository;
-import com.wavii.repository.VerificationRequestRepository;
-import com.wavii.repository.VerificationTokenRepository;
-import com.wavii.service.BandListingService;
-import com.wavii.service.PdfStorageService;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.MockedStatic;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.SpringApplication;
+import org.springframework.context.ConfigurableApplicationContext;
 
-@SpringBootTest(properties = {
-    "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration"
-})
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
 class WaviiApplicationTests {
 
-    @MockBean
-    private JwtAuthFilter jwtAuthFilter;
+    @Test
+    void waviiApplicationConstructorTest() {
+        assertDoesNotThrow(WaviiApplication::new);
+    }
 
-    @MockBean
-    private CustomUserDetailsService customUserDetailsService;
-
-    @MockBean
-    private BandListingService bandListingService;
-
-    @MockBean
-    private PdfStorageService pdfStorageService;
-
-    @MockBean
-    private UserRepository userRepository;
-
-    @MockBean
-    private VerificationTokenRepository verificationTokenRepository;
-
-    @MockBean
-    private VerificationRequestRepository verificationRequestRepository;
-
-    // @Test
-    // void contextLoads() {
-    //     // Context loads successfully, covering SecurityConfig and other beans.
-    // }
+    @Test
+    void mainMethodInvokesSpringApplicationRunTest() {
+        ConfigurableApplicationContext ctx = mock(ConfigurableApplicationContext.class);
+        try (MockedStatic<SpringApplication> mocked = mockStatic(SpringApplication.class)) {
+            mocked.when(() -> SpringApplication.run(WaviiApplication.class, new String[]{}))
+                    .thenReturn(ctx);
+            WaviiApplication.main(new String[]{});
+            mocked.verify(() -> SpringApplication.run(WaviiApplication.class, new String[]{}));
+        }
+    }
 }

@@ -7,6 +7,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+/**
+ * Reconciliador de esquema de base de datos.
+ * Se encarga de ejecutar sentencias SQL de alteración para asegurar que la base de datos
+ * tenga las columnas necesarias sin necesidad de migraciones manuales complejas.
+ * 
+ * @author eduglezexp
+ */
 @Configuration
 @RequiredArgsConstructor
 @Slf4j

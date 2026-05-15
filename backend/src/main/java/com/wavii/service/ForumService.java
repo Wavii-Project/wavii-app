@@ -19,6 +19,7 @@ import com.wavii.repository.ForumMembershipRepository;
 import com.wavii.repository.ForumPostRepository;
 import com.wavii.repository.ForumRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -37,8 +38,15 @@ import java.util.UUID;
 import jakarta.persistence.criteria.Predicate;
 import java.util.stream.Collectors;
 
+/**
+ * Servicio para la gestión de foros y comunidades en Wavii.
+ * Proporciona métodos para crear foros, gestionar membresías, publicaciones e interacciones.
+ * 
+ * @author danielrguezh
+ */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ForumService {
 
     private final ForumRepository forumRepository;
@@ -46,6 +54,16 @@ public class ForumService {
     private final ForumPostRepository postRepository;
     private final ForumLikeRepository likeRepository;
 
+    /**
+     * Obtiene la lista de foros filtrados por búsqueda, ciudad y categoría.
+     * 
+     * @param search Texto a buscar en el nombre.
+     * @param city Ciudad para filtrar.
+     * @param category Categoría del foro.
+     * @param sort Criterio de ordenación.
+     * @param currentUser Usuario actual para marcar estados de pertenencia y likes.
+     * @return Lista de resúmenes de foros.
+     */
     @Transactional(readOnly = true)
     public List<ForumSummaryResponse> getForums(String search, String city, String category, String sort, User currentUser) {
         String normalizedSearch = search != null && !search.isBlank() ? search.trim().toLowerCase() : null;
@@ -92,6 +110,13 @@ public class ForumService {
                 .toList();
     }
 
+    /**
+     * Obtiene los detalles de un foro específico por su ID.
+     * 
+     * @param id ID del foro.
+     * @param currentUser Usuario actual.
+     * @return Respuesta con los detalles del foro.
+     */
     @Transactional(readOnly = true)
     public ForumResponse getForumById(UUID id, User currentUser) {
         Forum forum = forumRepository.findById(id)
@@ -101,6 +126,13 @@ public class ForumService {
         return toResponse(forum, joined, liked, currentUser);
     }
 
+    /**
+     * Crea un nuevo foro en la plataforma.
+     * 
+     * @param request Datos de creación.
+     * @param creator Usuario creador.
+     * @return Respuesta con el foro creado.
+     */
     @Transactional
     public ForumResponse createForum(CreateForumRequest request, User creator) {
         if (request.name() == null || request.name().isBlank()) {
@@ -130,6 +162,12 @@ public class ForumService {
         return toResponse(forum, true, false, creator);
     }
 
+    /**
+     * Une al usuario actual a un foro.
+     * 
+     * @param forumId ID del foro.
+     * @param user Usuario actual.
+     */
     @Transactional
     public void joinForum(UUID forumId, User user) {
         Forum forum = forumRepository.findById(forumId)
@@ -146,6 +184,12 @@ public class ForumService {
         forumRepository.incrementMemberCount(forumId);
     }
 
+    /**
+     * Hace que el usuario abandone un foro.
+     * 
+     * @param forumId ID del foro.
+     * @param user Usuario actual.
+     */
     @Transactional
     public void leaveForum(UUID forumId, User user) {
         Forum forum = forumRepository.findById(forumId)
@@ -158,6 +202,12 @@ public class ForumService {
         reconcileAfterMemberRemoval(forum);
     }
 
+    /**
+     * Obtiene la lista de foros a los que pertenece el usuario.
+     * 
+     * @param user Usuario actual.
+     * @return Lista de resúmenes de sus foros.
+     */
     @Transactional(readOnly = true)
     public List<ForumSummaryResponse> getMyForums(User user) {
         return membershipRepository.findByUserWithForum(user).stream()
@@ -166,6 +216,13 @@ public class ForumService {
                 .toList();
     }
 
+    /**
+     * Lista los miembros de un foro.
+     * 
+     * @param forumId ID del foro.
+     * @param requester Usuario que realiza la consulta (debe ser miembro).
+     * @return Lista de miembros con sus roles.
+     */
     @Transactional(readOnly = true)
     public List<ForumMemberResponse> getMembers(UUID forumId, User requester) {
         Forum forum = findForum(forumId);
@@ -173,6 +230,13 @@ public class ForumService {
         return getMemberResponses(forum);
     }
 
+    /**
+     * Registra un "me gusta" en un foro.
+     * 
+     * @param forumId ID del foro.
+     * @param user Usuario actual.
+     * @return Respuesta actualizada del foro.
+     */
     @Transactional
     public ForumResponse likeForum(UUID forumId, User user) {
         Forum forum = findForum(forumId);
@@ -185,6 +249,13 @@ public class ForumService {
         return toResponse(forum, joined, true, user);
     }
 
+    /**
+     * Retira un "me gusta" de un foro.
+     * 
+     * @param forumId ID del foro.
+     * @param user Usuario actual.
+     * @return Respuesta actualizada del foro.
+     */
     @Transactional
     public ForumResponse unlikeForum(UUID forumId, User user) {
         Forum forum = findForum(forumId);
@@ -197,6 +268,15 @@ public class ForumService {
         return toResponse(forum, joined, false, user);
     }
 
+    /**
+     * Actualiza el rol de un miembro del foro (solo permitido para el OWNER).
+     * 
+     * @param forumId ID del foro.
+     * @param userId ID del miembro a actualizar.
+     * @param role Nuevo rol.
+     * @param requester Usuario que realiza la acción.
+     * @return Respuesta actualizada del foro.
+     */
     @Transactional
     public ForumResponse updateMemberRole(UUID forumId, UUID userId, ForumMembershipRole role, User requester) {
         Forum forum = findForum(forumId);
@@ -219,6 +299,13 @@ public class ForumService {
         return toResponse(forum, true, likeRepository.existsByForumAndUser(forum, requester), requester);
     }
 
+    /**
+     * Expulsa a un miembro del foro (solo permitido para ADMIN u OWNER).
+     * 
+     * @param forumId ID del foro.
+     * @param userId ID del miembro a expulsar.
+     * @param requester Usuario que realiza la acción.
+     */
     @Transactional
     public void removeMember(UUID forumId, UUID userId, User requester) {
         Forum forum = findForum(forumId);
@@ -237,6 +324,14 @@ public class ForumService {
         reconcileAfterMemberRemoval(forum);
     }
 
+    /**
+     * Obtiene los mensajes (posts) de un foro en formato paginado.
+     * 
+     * @param forumId ID del foro.
+     * @param page Número de página.
+     * @param currentUser Usuario actual.
+     * @return Página de mensajes.
+     */
     @Transactional(readOnly = true)
     public Page<PostResponse> getPosts(UUID forumId, int page, User currentUser) {
         Forum forum = forumRepository.findById(forumId)

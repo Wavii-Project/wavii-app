@@ -11,6 +11,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Entidad que representa un anuncio de banda o músico en el marketplace.
+ * Contiene información sobre el tipo de anuncio, género musical, ciudad y roles buscados.
+ * 
+ * @author danielrguezh
+ */
 @Entity
 @Table(name = "band_listings")
 @Data

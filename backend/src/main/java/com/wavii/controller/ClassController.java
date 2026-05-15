@@ -20,6 +20,12 @@ public class ClassController {
 
     private final ClassService classService;
 
+    /**
+     * Lista las clases en las que participa el usuario actual.
+     * 
+     * @param currentUser Usuario autenticado.
+     * @return Listado de clases.
+     */
     @GetMapping
     public ResponseEntity<?> listClasses(@AuthenticationPrincipal User currentUser) {
         if (currentUser == null) {
@@ -35,6 +41,12 @@ public class ClassController {
         }
     }
 
+    /**
+     * Obtiene un resumen de gestión para el profesor o alumno.
+     * 
+     * @param currentUser Usuario autenticado.
+     * @return Resumen de clases y solicitudes.
+     */
     @GetMapping("/manage")
     public ResponseEntity<?> manage(@AuthenticationPrincipal User currentUser) {
         if (currentUser == null) {
@@ -48,6 +60,13 @@ public class ClassController {
         }
     }
 
+    /**
+     * Inicia el proceso de pago para contratar a un profesor.
+     * 
+     * @param teacherId ID del profesor a contratar.
+     * @param currentUser Usuario autenticado (alumno).
+     * @return Datos para el checkout de Stripe.
+     */
     @PostMapping("/{teacherId}/checkout")
     public ResponseEntity<?> checkout(@PathVariable UUID teacherId, @AuthenticationPrincipal User currentUser) {
         try {
@@ -58,6 +77,14 @@ public class ClassController {
         }
     }
 
+    /**
+     * Crea una solicitud de clase (tras el pago o reserva).
+     * 
+     * @param teacherId ID del profesor.
+     * @param currentUser Usuario autenticado.
+     * @param body Datos de la solicitud.
+     * @return La inscripción creada.
+     */
     @PostMapping("/{teacherId}/request")
     public ResponseEntity<?> requestClass(@PathVariable UUID teacherId,
                                           @AuthenticationPrincipal User currentUser,
@@ -70,6 +97,13 @@ public class ClassController {
         }
     }
 
+    /**
+     * Confirma una inscripción de clase.
+     * 
+     * @param enrollmentId ID de la inscripción.
+     * @param currentUser Usuario autenticado.
+     * @return La inscripción confirmada.
+     */
     @PostMapping("/{enrollmentId}/confirm")
     public ResponseEntity<?> confirm(@PathVariable UUID enrollmentId, @AuthenticationPrincipal User currentUser) {
         try {
@@ -80,6 +114,13 @@ public class ClassController {
         }
     }
 
+    /**
+     * Obtiene los mensajes del chat de una clase.
+     * 
+     * @param enrollmentId ID de la inscripción.
+     * @param currentUser Usuario autenticado.
+     * @return Lista de mensajes.
+     */
     @GetMapping("/{enrollmentId}/messages")
     public ResponseEntity<?> messages(@PathVariable UUID enrollmentId, @AuthenticationPrincipal User currentUser) {
         try {
@@ -89,6 +130,14 @@ public class ClassController {
         }
     }
 
+    /**
+     * Envía un mensaje al chat de la clase.
+     * 
+     * @param enrollmentId ID de la inscripción.
+     * @param currentUser Usuario autenticado.
+     * @param body Cuerpo con el contenido del mensaje.
+     * @return El mensaje enviado.
+     */
     @PostMapping("/{enrollmentId}/messages")
     public ResponseEntity<?> sendMessage(@PathVariable UUID enrollmentId,
                                          @AuthenticationPrincipal User currentUser,
@@ -100,6 +149,13 @@ public class ClassController {
         }
     }
 
+    /**
+     * Obtiene los posts (muro) de las clases de un profesor.
+     * 
+     * @param teacherId ID del profesor.
+     * @param currentUser Usuario autenticado.
+     * @return Lista de posts.
+     */
     @GetMapping("/{teacherId}/posts")
     public ResponseEntity<?> posts(@PathVariable UUID teacherId, @AuthenticationPrincipal User currentUser) {
         try {
@@ -109,6 +165,12 @@ public class ClassController {
         }
     }
 
+    /**
+     * Obtiene los posts de todos los profesores a los que sigue el alumno.
+     * 
+     * @param currentUser Usuario autenticado (alumno).
+     * @return Lista de posts del tablón del alumno.
+     */
     @GetMapping("/posts")
     public ResponseEntity<?> studentPosts(@AuthenticationPrincipal User currentUser) {
         try {
@@ -118,6 +180,14 @@ public class ClassController {
         }
     }
 
+    /**
+     * Crea un post en el muro de clases de un profesor.
+     * 
+     * @param teacherId ID del profesor.
+     * @param currentUser Usuario autenticado.
+     * @param body Datos del post (título y contenido).
+     * @return El post creado.
+     */
     @PostMapping("/{teacherId}/posts")
     public ResponseEntity<?> createPost(@PathVariable UUID teacherId,
                                         @AuthenticationPrincipal User currentUser,
@@ -133,6 +203,13 @@ public class ClassController {
         }
     }
 
+    /**
+     * Solicita una hora extra para una clase.
+     * 
+     * @param enrollmentId ID de la inscripción.
+     * @param currentUser Usuario autenticado.
+     * @return Resultado de la solicitud.
+     */
     @PostMapping("/{enrollmentId}/request-extra-hour")
     public ResponseEntity<?> requestExtraHour(@PathVariable UUID enrollmentId,
                                               @AuthenticationPrincipal User currentUser) {
@@ -143,6 +220,13 @@ public class ClassController {
         }
     }
 
+    /**
+     * Solicita un reembolso para una clase.
+     * 
+     * @param enrollmentId ID de la inscripción.
+     * @param currentUser Usuario autenticado.
+     * @return Resultado de la solicitud.
+     */
     @PostMapping("/{enrollmentId}/refund-request")
     public ResponseEntity<?> requestRefund(@PathVariable UUID enrollmentId,
                                            @AuthenticationPrincipal User currentUser) {
@@ -153,6 +237,14 @@ public class ClassController {
         }
     }
 
+    /**
+     * Actualiza el estado de una inscripción.
+     * 
+     * @param enrollmentId ID de la inscripción.
+     * @param currentUser Usuario autenticado.
+     * @param body Mapa con el nuevo estado.
+     * @return La inscripción actualizada.
+     */
     @PatchMapping("/{enrollmentId}/status")
     public ResponseEntity<?> updateStatus(@PathVariable UUID enrollmentId,
                                           @AuthenticationPrincipal User currentUser,
@@ -164,6 +256,14 @@ public class ClassController {
         }
     }
 
+    /**
+     * Crea una sesión programada para una clase.
+     * 
+     * @param enrollmentId ID de la inscripción.
+     * @param currentUser Usuario autenticado.
+     * @param body Datos de la sesión.
+     * @return La sesión creada.
+     */
     @PostMapping("/{enrollmentId}/sessions")
     public ResponseEntity<?> createSession(@PathVariable UUID enrollmentId,
                                            @AuthenticationPrincipal User currentUser,
@@ -175,6 +275,14 @@ public class ClassController {
         }
     }
 
+    /**
+     * Actualiza una sesión programada.
+     * 
+     * @param sessionId ID de la sesión.
+     * @param currentUser Usuario autenticado.
+     * @param body Datos a actualizar.
+     * @return La sesión actualizada.
+     */
     @PatchMapping("/sessions/{sessionId}")
     public ResponseEntity<?> updateSession(@PathVariable UUID sessionId,
                                            @AuthenticationPrincipal User currentUser,

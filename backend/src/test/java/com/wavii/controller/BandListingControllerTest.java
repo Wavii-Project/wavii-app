@@ -17,6 +17,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -172,5 +174,78 @@ class BandListingControllerTest {
                 .when(service).delete(listingId, user);
 
         assertThrows(ResponseStatusException.class, () -> controller.delete(listingId, user));
+    }
+
+    // ─── uploadBandImage ─────────────────────────────────────────
+
+    @Test
+    void uploadBandImageNullFileReturnsBadRequestTest() {
+        ReflectionTestUtils.setField(controller, "pdfStoragePath", "./uploads/pdfs");
+        ReflectionTestUtils.setField(controller, "appBaseUrl", "http://localhost:8080");
+
+        ResponseEntity<?> result = controller.uploadBandImage(null);
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+    }
+
+    @Test
+    void uploadBandImageEmptyFileReturnsBadRequestTest() {
+        ReflectionTestUtils.setField(controller, "pdfStoragePath", "./uploads/pdfs");
+        ReflectionTestUtils.setField(controller, "appBaseUrl", "http://localhost:8080");
+        MockMultipartFile file = new MockMultipartFile("file", new byte[0]);
+
+        ResponseEntity<?> result = controller.uploadBandImage(file);
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+    }
+
+    @Test
+    void uploadBandImageNonImageContentTypeReturnsBadRequestTest() {
+        ReflectionTestUtils.setField(controller, "pdfStoragePath", "./uploads/pdfs");
+        ReflectionTestUtils.setField(controller, "appBaseUrl", "http://localhost:8080");
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "doc.pdf", "application/pdf", "content".getBytes());
+
+        ResponseEntity<?> result = controller.uploadBandImage(file);
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+    }
+
+    @Test
+    void uploadBandImageNullContentTypeReturnsBadRequestTest() {
+        ReflectionTestUtils.setField(controller, "pdfStoragePath", "./uploads/pdfs");
+        ReflectionTestUtils.setField(controller, "appBaseUrl", "http://localhost:8080");
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "image.png", null, "content".getBytes());
+
+        ResponseEntity<?> result = controller.uploadBandImage(file);
+
+        assertEquals(HttpStatus.BAD_REQUEST, result.getStatusCode());
+    }
+
+    @Test
+    void uploadBandImageValidImageReturnsOkTest() {
+        ReflectionTestUtils.setField(controller, "pdfStoragePath",
+                System.getProperty("java.io.tmpdir") + "/pdfs");
+        ReflectionTestUtils.setField(controller, "appBaseUrl", "http://localhost:8080");
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "band.jpg", "image/jpeg", "image-data".getBytes());
+
+        ResponseEntity<?> result = controller.uploadBandImage(file);
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
+    }
+
+    @Test
+    void uploadBandImageNoExtensionUsesDefaultJpgTest() {
+        ReflectionTestUtils.setField(controller, "pdfStoragePath",
+                System.getProperty("java.io.tmpdir") + "/pdfs");
+        ReflectionTestUtils.setField(controller, "appBaseUrl", "http://localhost:8080");
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "band", "image/png", "image-data".getBytes());
+
+        ResponseEntity<?> result = controller.uploadBandImage(file);
+
+        assertEquals(HttpStatus.OK, result.getStatusCode());
     }
 }

@@ -11,6 +11,7 @@ import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -24,12 +25,28 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Servicio para la gestión de anuncios de bandas y músicos.
+ * Permite crear, listar, filtrar y eliminar anuncios en el marketplace.
+ * 
+ * @author danielrguezh
+ */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class BandListingService {
 
     private final BandListingRepository repository;
 
+    /**
+     * Obtiene una página de anuncios de bandas filtrados por género, ciudad y rol.
+     * 
+     * @param genreStr Nombre del género musical.
+     * @param city Ciudad del anuncio.
+     * @param roleStr Nombre del rol (instrumento/puesto).
+     * @param page Número de página.
+     * @return Página de resultados de anuncios.
+     */
     @Transactional(readOnly = true)
     public Page<BandListingResponse> getListings(String genreStr, String city, String roleStr, int page) {
         MusicalGenre genre = parseEnum(MusicalGenre.class, genreStr);
@@ -56,11 +73,24 @@ public class BandListingService {
                 .map(this::toResponse);
     }
 
+    /**
+     * Obtiene un anuncio por su ID único.
+     * 
+     * @param id ID del anuncio.
+     * @return Respuesta con los datos del anuncio.
+     */
     @Transactional(readOnly = true)
     public BandListingResponse getById(UUID id) {
         return toResponse(findOrThrow(id));
     }
 
+    /**
+     * Crea un nuevo anuncio de banda.
+     * 
+     * @param req Datos para la creación del anuncio.
+     * @param creator Usuario que crea el anuncio.
+     * @return Respuesta con el anuncio creado.
+     */
     @Transactional
     public BandListingResponse create(CreateBandListingRequest req, User creator) {
         validate(req);
@@ -79,6 +109,12 @@ public class BandListingService {
         return toResponse(repository.save(listing));
     }
 
+    /**
+     * Elimina un anuncio si el usuario solicitante es su creador.
+     * 
+     * @param id ID del anuncio.
+     * @param requester Usuario que solicita el borrado.
+     */
     @Transactional
     public void delete(UUID id, User requester) {
         BandListing listing = findOrThrow(id);
@@ -88,6 +124,12 @@ public class BandListingService {
         repository.delete(listing);
     }
 
+    /**
+     * Obtiene la lista de anuncios creados por el usuario especificado.
+     * 
+     * @param user Usuario creador.
+     * @return Lista de anuncios del usuario.
+     */
     @Transactional(readOnly = true)
     public List<BandListingResponse> getMyListings(User user) {
         return repository.findByCreatorIdOrderByCreatedAtDesc(user.getId())

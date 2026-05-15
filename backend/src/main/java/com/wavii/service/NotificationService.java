@@ -20,6 +20,16 @@ public class NotificationService {
     private final AppNotificationRepository notificationRepository;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Crea y guarda una nueva notificación para un usuario.
+     * 
+     * @param recipient Usuario destinatario.
+     * @param type Tipo de notificación (ej. "class_request").
+     * @param title Título de la notificación.
+     * @param body Cuerpo o mensaje de la notificación.
+     * @param data Datos adicionales en formato mapa para adjuntar como JSON.
+     * @return La notificación creada.
+     */
     @Transactional
     public AppNotification create(User recipient, String type, String title, String body, Map<String, Object> data) {
         return notificationRepository.save(AppNotification.builder()
@@ -31,6 +41,12 @@ public class NotificationService {
                 .build());
     }
 
+    /**
+     * Lista todas las notificaciones de un usuario, ordenadas por fecha descendente.
+     * 
+     * @param recipient Usuario que consulta sus notificaciones.
+     * @return Lista de notificaciones en formato mapa.
+     */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> list(User recipient) {
         return notificationRepository.findByRecipientOrderByCreatedAtDesc(recipient).stream()
@@ -38,6 +54,13 @@ public class NotificationService {
                 .toList();
     }
 
+    /**
+     * Marca una notificación específica como leída.
+     * 
+     * @param recipient Usuario dueño de la notificación.
+     * @param notificationId ID de la notificación.
+     * @return La notificación actualizada.
+     */
     @Transactional
     public Map<String, Object> markRead(User recipient, UUID notificationId) {
         AppNotification notification = notificationRepository.findById(notificationId)
@@ -49,17 +72,35 @@ public class NotificationService {
         return toMap(notificationRepository.save(notification));
     }
 
+    /**
+     * Obtiene un resumen de las notificaciones, como el conteo de no leídas.
+     * 
+     * @param recipient Usuario destinatario.
+     * @return Mapa con el conteo de no leídas.
+     */
     @Transactional(readOnly = true)
     public Map<String, Object> summary(User recipient) {
         return Map.of("unreadCount", notificationRepository.countByRecipientAndReadFalse(recipient));
     }
 
+    /**
+     * Elimina todas las notificaciones de un usuario.
+     * 
+     * @param recipient Usuario destinatario.
+     * @return Mapa con el número de notificaciones eliminadas.
+     */
     @Transactional
     public Map<String, Object> clearAll(User recipient) {
         long removed = notificationRepository.deleteByRecipient(recipient);
         return Map.of("removed", removed);
     }
 
+    /**
+     * Marca todas las notificaciones de un usuario como leídas.
+     * 
+     * @param recipient Usuario destinatario.
+     * @return Mapa con el número de notificaciones actualizadas.
+     */
     @Transactional
     public Map<String, Object> markAllRead(User recipient) {
         int updated = notificationRepository.markAllReadByRecipient(recipient);

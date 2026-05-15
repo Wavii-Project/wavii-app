@@ -31,11 +31,18 @@ public class SubscriptionController {
 
     private static final String STRIPE_API_VERSION = "2023-10-16";
 
+    /**
+     * Crea un SetupIntent de Stripe para preparar la recogida de un método de pago.
+     * 
+     * @param req Datos con el plan deseado.
+     * @param principal Usuario autenticado.
+     * @return 200 OK con los secretos de Stripe para el frontend.
+     */
     @PostMapping("/setup-intent")
     public ResponseEntity<?> createSetupIntent(
             @RequestBody SetupIntentRequest req,
             Principal principal) {
-
+// ... (omitted code for brevity)
         User user = getUser(principal);
 
         if (!stripeService.isConfigured()) {
@@ -71,6 +78,13 @@ public class SubscriptionController {
         }
     }
 
+    /**
+     * Confirma la suscripción tras haber completado el SetupIntent con éxito.
+     * 
+     * @param req Datos con el ID del SetupIntent y el plan.
+     * @param principal Usuario autenticado.
+     * @return 200 OK con el resultado de la suscripción.
+     */
     @PostMapping("/confirm")
     public ResponseEntity<?> confirmSubscription(
             @RequestBody ConfirmSubscriptionRequest req,
@@ -108,6 +122,13 @@ public class SubscriptionController {
         }
     }
 
+    /**
+     * Inicia una suscripción directamente con un ID de método de pago.
+     * 
+     * @param req Datos con el plan y el ID del método de pago.
+     * @param principal Usuario autenticado.
+     * @return 200 OK con el resultado de la suscripción.
+     */
     @PostMapping("/start")
     public ResponseEntity<?> startSubscription(
             @RequestBody StartSubscriptionRequest req,
@@ -148,6 +169,12 @@ public class SubscriptionController {
         }
     }
 
+    /**
+     * Programa la cancelación de la suscripción para el final del periodo actual.
+     * 
+     * @param principal Usuario autenticado.
+     * @return 200 OK con los detalles de la cancelación.
+     */
     @PostMapping("/cancel")
     public ResponseEntity<?> cancelSubscription(Principal principal) {
         User user = getUser(principal);
@@ -209,6 +236,12 @@ public class SubscriptionController {
         }
     }
 
+    /**
+     * Reactiva una suscripción que estaba programada para cancelarse.
+     * 
+     * @param principal Usuario autenticado.
+     * @return 200 OK con los detalles de la reactivación.
+     */
     @PostMapping("/reactivate")
     public ResponseEntity<?> reactivateSubscription(Principal principal) {
         User user = getUser(principal);
@@ -253,6 +286,13 @@ public class SubscriptionController {
         }
     }
 
+    /**
+     * Cambia el plan de suscripción actual (upgrade o downgrade).
+     * 
+     * @param req Datos con el nuevo plan.
+     * @param principal Usuario autenticado.
+     * @return 200 OK con el resultado del cambio de plan.
+     */
     @PostMapping("/change")
     public ResponseEntity<?> changeSubscription(
             @RequestBody ChangeSubscriptionRequest req,
@@ -333,6 +373,12 @@ public class SubscriptionController {
         }
     }
 
+    /**
+     * Obtiene el estado detallado de la suscripción del usuario actual.
+     * 
+     * @param principal Usuario autenticado.
+     * @return 200 OK con los datos de suscripción.
+     */
     @GetMapping("/status")
     public ResponseEntity<?> getStatus(Principal principal) {
         User user = getUser(principal);
@@ -349,12 +395,19 @@ public class SubscriptionController {
         ));
     }
 
+    /**
+     * Punto de entrada para los webhooks de Stripe (eventos de pago, cancelación, etc.).
+     * 
+     * @param payload Cuerpo del evento enviado por Stripe.
+     * @param sigHeader Cabecera de firma para validar el origen.
+     * @return 200 OK.
+     */
     @PostMapping("/webhook")
     @SuppressWarnings("unchecked")
     public ResponseEntity<String> handleWebhook(
             @RequestBody String payload,
             @RequestHeader(value = "Stripe-Signature", required = false) String sigHeader) {
-
+// ... (omitted switch block for brevity)
         try {
             Event event = stripeService.constructWebhookEvent(payload, sigHeader);
             log.info("Webhook Stripe recibido: {}", event.getType());
@@ -381,6 +434,7 @@ public class SubscriptionController {
         }
     }
 
+    /** Procesa un pago de factura realizado con éxito. */
     @SuppressWarnings("unchecked")
     private void handleInvoicePaymentSucceeded(Map<String, Object> invoice) {
         String customerId = (String) invoice.get("customer");
@@ -410,6 +464,7 @@ public class SubscriptionController {
         }, () -> log.warn("Webhook: no se encontro usuario con customerId={}", customerId));
     }
 
+    /** Procesa cambios en una suscripción activa. */
     @SuppressWarnings("unchecked")
     private void handleSubscriptionUpdated(Map<String, Object> sub) {
         String customerId = (String) sub.get("customer");
@@ -430,6 +485,7 @@ public class SubscriptionController {
         });
     }
 
+    /** Procesa la eliminación/cancelación definitiva de una suscripción. */
     private void handleSubscriptionDeleted(Map<String, Object> sub) {
         String customerId = (String) sub.get("customer");
         userRepository.findByStripeCustomerId(customerId).ifPresent(user -> {
@@ -442,6 +498,7 @@ public class SubscriptionController {
         });
     }
 
+    /** Procesa un fallo en el pago de la suscripción. */
     private void handleInvoicePaymentFailed(Map<String, Object> invoice) {
         String customerId = (String) invoice.get("customer");
         userRepository.findByStripeCustomerId(customerId).ifPresent(user -> {
@@ -452,21 +509,25 @@ public class SubscriptionController {
         });
     }
 
+    /** Obtiene el usuario actual a partir del Principal. */
     private User getUser(Principal principal) {
         return userRepository.findByEmail(principal.getName())
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
     }
 
+    /** Mapea el nombre del plan a su valor enum. */
     private Subscription toSubscriptionEnum(String plan) {
         return "scholar".equals(plan) ? Subscription.EDUCATION : Subscription.PLUS;
     }
 
+    /** Determina si se debe aplicar la promoción Scholar (cambio desde Plus). */
     private boolean shouldApplyScholarPromo(User user, String targetPlan) {
         return "scholar".equals(targetPlan)
                 && user.getSubscription() == Subscription.PLUS
                 && !"trialing".equalsIgnoreCase(user.getSubscriptionStatus());
     }
 
+    /** Aplica el resultado de una operación de Stripe al estado local del usuario. */
     private void applySubscriptionResult(User user, String plan, Map<String, Object> result) {
         user.setStripeSubscriptionId((String) result.get("subscriptionId"));
         String status = (String) result.get("status");

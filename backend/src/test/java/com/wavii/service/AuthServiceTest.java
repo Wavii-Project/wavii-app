@@ -238,4 +238,183 @@ class AuthServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> authService.resendVerification("test@test.com"));
     }
+
+    @Test
+    void registerNameAlreadyExistsTest() {
+        RegisterRequest request = new RegisterRequest();
+        request.setName("Test User");
+        request.setEmail("new@test.com");
+        request.setPassword("password");
+
+        when(userRepository.existsByNameIgnoreCase("Test User")).thenReturn(true);
+
+        assertThrows(IllegalArgumentException.class, () -> authService.register(request));
+    }
+
+    @Test
+    void resetPasswordAlreadyUsedTokenTest() {
+        verificationToken.setType("PASSWORD_RESET");
+        verificationToken.setUsed(true);
+        ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setToken("token-123");
+        request.setNewPassword("new_password");
+
+        when(tokenRepository.findByToken("token-123")).thenReturn(Optional.of(verificationToken));
+
+        assertThrows(IllegalArgumentException.class, () -> authService.resetPassword(request));
+    }
+
+    @Test
+    void resetPasswordExpiredTokenTest() {
+        verificationToken.setType("PASSWORD_RESET");
+        verificationToken.setExpiresAt(LocalDateTime.now().minusHours(2));
+        ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setToken("token-123");
+        request.setNewPassword("new_password");
+
+        when(tokenRepository.findByToken("token-123")).thenReturn(Optional.of(verificationToken));
+
+        assertThrows(IllegalArgumentException.class, () -> authService.resetPassword(request));
+    }
+
+    @Test
+    void resetPasswordWrongTokenTypeTest() {
+        verificationToken.setType("EMAIL_VERIFICATION");
+        ResetPasswordRequest request = new ResetPasswordRequest();
+        request.setToken("token-123");
+        request.setNewPassword("new_password");
+
+        when(tokenRepository.findByToken("token-123")).thenReturn(Optional.of(verificationToken));
+
+        assertThrows(IllegalArgumentException.class, () -> authService.resetPassword(request));
+    }
+
+    @Test
+    void verifyEmailAlreadyUsedTokenTest() {
+        verificationToken.setUsed(true);
+        when(tokenRepository.findByToken("token-123")).thenReturn(Optional.of(verificationToken));
+
+        assertThrows(IllegalArgumentException.class, () -> authService.verifyEmail("token-123"));
+    }
+
+    @Test
+    void verifyEmailWrongTokenTypeTest() {
+        verificationToken.setType("PASSWORD_RESET");
+        when(tokenRepository.findByToken("token-123")).thenReturn(Optional.of(verificationToken));
+
+        assertThrows(IllegalArgumentException.class, () -> authService.verifyEmail("token-123"));
+    }
+
+    @Test
+    void resendVerificationUserNotFoundTest() {
+        when(userRepository.findByEmail("notfound@test.com")).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> authService.resendVerification("notfound@test.com"));
+    }
+
+    @Test
+    void isEmailVerifiedTrueTest() {
+        when(userRepository.findByEmail("test@test.com")).thenReturn(Optional.of(user));
+
+        assertTrue(authService.isEmailVerified("test@test.com"));
+    }
+
+    @Test
+    void isEmailVerifiedUserNotFoundReturnsFalseTest() {
+        when(userRepository.findByEmail("notfound@test.com")).thenReturn(Optional.empty());
+
+        assertFalse(authService.isEmailVerified("notfound@test.com"));
+    }
+
+    @Test
+    void refreshTokenUserNotFoundTest() {
+        RefreshTokenRequest request = new RefreshTokenRequest();
+        request.setRefreshToken("valid_token");
+
+        when(jwtService.extractEmail("valid_token")).thenReturn("notfound@test.com");
+        when(userRepository.findByEmail("notfound@test.com")).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> authService.refreshToken(request));
+    }
+
+    @Test
+    void refreshTokenInvalidButExtractableTest() {
+        RefreshTokenRequest request = new RefreshTokenRequest();
+        request.setRefreshToken("valid_email_invalid_sig");
+
+        when(jwtService.extractEmail("valid_email_invalid_sig")).thenReturn("test@test.com");
+        when(userRepository.findByEmail("test@test.com")).thenReturn(Optional.of(user));
+        when(jwtService.isTokenValid("valid_email_invalid_sig", user)).thenReturn(false);
+
+        assertThrows(IllegalArgumentException.class, () -> authService.refreshToken(request));
+    }
+
+    @Test
+    void forgotPasswordUserNotFoundDoesNothingTest() {
+        ForgotPasswordRequest request = new ForgotPasswordRequest();
+        request.setEmail("notfound@test.com");
+
+        when(userRepository.findByEmail("notfound@test.com")).thenReturn(Optional.empty());
+
+        authService.forgotPassword(request);
+
+        verifyNoInteractions(emailService);
+    }
+
+    @Test
+    void verifyEmailCallsOdooServiceTest() {
+        when(tokenRepository.findByToken("token-123")).thenReturn(Optional.of(verificationToken));
+        when(jwtService.generateAccessToken(user)).thenReturn("access");
+        when(jwtService.generateRefreshToken(user)).thenReturn("refresh");
+
+        authService.verifyEmail("token-123");
+
+        verify(odooService).createCrmContact(
+                eq(user.getName()), eq(user.getEmail()), anyString(), anyString());
+    }
+
+    @Test
+    void forgotPasswordInvalidatesPreviousTokensWhenExistTest() {
+        VerificationToken oldToken = new VerificationToken();
+        oldToken.setToken("old-token");
+        oldToken.setUser(user);
+        oldToken.setType("PASSWORD_RESET");
+        oldToken.setExpiresAt(LocalDateTime.now().plusHours(1));
+        oldToken.setUsed(false);
+
+        ForgotPasswordRequest request = new ForgotPasswordRequest();
+        request.setEmail("test@test.com");
+
+        when(userRepository.findByEmail("test@test.com")).thenReturn(Optional.of(user));
+        when(tokenRepository.findAllByUserAndTypeAndUsedFalse(user, "PASSWORD_RESET"))
+                .thenReturn(List.of(oldToken));
+
+        authService.forgotPassword(request);
+
+        assertTrue(oldToken.isUsed());
+        verify(tokenRepository).saveAll(List.of(oldToken));
+        verify(tokenRepository, times(1)).save(any(VerificationToken.class));
+        verify(emailService, times(1)).sendPasswordResetEmail(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void resendVerificationInvalidatesPreviousTokensTest() {
+        VerificationToken oldToken = new VerificationToken();
+        oldToken.setToken("old-ver-token");
+        oldToken.setUser(user);
+        oldToken.setType("EMAIL_VERIFICATION");
+        oldToken.setExpiresAt(LocalDateTime.now().plusHours(1));
+        oldToken.setUsed(false);
+
+        user.setEmailVerified(false);
+        when(userRepository.findByEmail("test@test.com")).thenReturn(Optional.of(user));
+        when(tokenRepository.findAllByUserAndTypeAndUsedFalse(user, "EMAIL_VERIFICATION"))
+                .thenReturn(List.of(oldToken));
+
+        authService.resendVerification("test@test.com");
+
+        assertTrue(oldToken.isUsed());
+        verify(tokenRepository).saveAll(List.of(oldToken));
+    }
 }

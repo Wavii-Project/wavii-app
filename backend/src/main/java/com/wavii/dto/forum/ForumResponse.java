@@ -1,5 +1,11 @@
 package com.wavii.dto.forum;
 
+/**
+ * DTO que representa la respuesta detallada de un foro.
+ * Incluye información de membresía, estadísticas y lista de miembros.
+ * 
+ * @author danielrguezh
+ */
 public record ForumResponse(
         String id,
         String name,

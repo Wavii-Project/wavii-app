@@ -6,8 +6,8 @@ import com.wavii.model.enums.Level;
 import java.time.LocalDate;
 
 /**
- * DTO que devuelve el backend al frontend con los datos de un desafio diario.
- * Incluye si el usuario ya lo ha completado.
+ * DTO que representa un desafío diario para ser enviado al cliente.
+ * Incluye información sobre la tablatura asociada y el estado de completado para el usuario actual.
  */
 public record DailyChallengeDto(
         Long id,
