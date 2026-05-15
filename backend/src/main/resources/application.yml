@@ -1,0 +1,90 @@
+spring:
+  application:
+    name: wavii-api
+
+  profiles:
+    active: dev
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/wavii
+    username: wavii
+    password: wavii_dev
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:noreply@wavii.com}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+wavii:
+  jwt:
+    secret: "${JWT_SECRET:dev_secret_wavii_shared_default_2026_x}"
+    access-token-expiry: 900
+    refresh-token-expiry: 2592000
+  app:
+    base-url: "${APP_BASE_URL:http://localhost:8080}"
+
+pdf:
+  storage:
+    path: ./uploads/pdfs
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.wavii: DEBUG
+    org.springframework.security: INFO
+    org.hibernate.SQL: INFO
+
+stripe:
+  secret-key: "${STRIPE_SECRET_KEY:}"
+  price-plus: "${STRIPE_PRICE_PLUS:}"
+  price-scholar: "${STRIPE_PRICE_SCHOLAR:}"
+  webhook-secret: "${STRIPE_WEBHOOK_SECRET:}"
+  coupon-scholar-promo: "${STRIPE_COUPON_SCHOLAR_PROMO:${STRIPE_COUPON_PLUS_PROMO:}}"
+
+odoo:
+  url: "${ODOO_URL:http://localhost:8069}"
+  db: "${ODOO_DB:wavii_odoo}"
+  user: "${ODOO_USER:admin}"
+  password: "${ODOO_PASSWORD:wavii_admin_2026}"
+  webhook-secret: "${ODOO_WEBHOOK_SECRET:}"
+
+newsdata:
+  api-key: "${NEWSDATA_API_KEY:}"
+  base-url: "https://newsdata.io/api/1"

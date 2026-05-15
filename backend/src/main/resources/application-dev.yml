@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/wavii
+    username: wavii
+    password: wavii_dev
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+wavii:
+  jwt:
+    secret: "dev_secret_change_in_production_must_be_32_chars"
+  app:
+    base-url: "http://localhost:8080"
+
+newsdata:
+  api-key: "pub_e4e94306cd6f419a878412b5c6a42c0f"
+
+logging:
+  level:
+    com.wavii: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE

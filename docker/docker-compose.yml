@@ -1,0 +1,195 @@
+services:
+
+  # ─────────────────────────────────────────
+  # PostgreSQL — base de datos relacional
+  # ─────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: wavii-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-wavii}
+      POSTGRES_USER: ${POSTGRES_USER:-wavii}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wavii_dev}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wavii} -d ${POSTGRES_DB:-wavii}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - wavii-net
+
+  # ─────────────────────────────────────────
+  # MongoDB — base de datos documental
+  # ─────────────────────────────────────────
+  mongodb:
+    image: mongo:7.0
+    container_name: wavii-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-wavii}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-wavii_dev}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-wavii_docs}
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - wavii-net
+
+  # ─────────────────────────────────────────
+  # Backend — Spring Boot API
+  # ─────────────────────────────────────────
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: wavii-backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-wavii}
+      DB_USER: ${POSTGRES_USER:-wavii}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-wavii_dev}
+      MONGO_HOST: mongodb
+      MONGO_PORT: 27017
+      MONGO_USER: ${MONGO_USER:-wavii}
+      MONGO_PASSWORD: ${MONGO_PASSWORD:-wavii_dev}
+      MONGO_DB: ${MONGO_DB:-wavii_docs}
+      JWT_SECRET: ${JWT_SECRET:-dev_secret_wavii_shared_default_2026_x}
+      MAIL_HOST: smtp.gmail.com
+      MAIL_PORT: 587
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
+      NEWSDATA_API_KEY: ${NEWSDATA_API_KEY:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PRICE_PLUS: ${STRIPE_PRICE_PLUS:-}
+      STRIPE_PRICE_SCHOLAR: ${STRIPE_PRICE_SCHOLAR:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      ODOO_URL: ${ODOO_URL:-http://odoo:8069}
+      ODOO_DB: ${ODOO_DB:-wavii_odoo}
+      ODOO_USER: ${ODOO_USER:-admin}
+      ODOO_PASSWORD: ${ODOO_PASSWORD:-wavii_admin_2026}
+      ODOO_WEBHOOK_SECRET: ${ODOO_WEBHOOK_SECRET:-}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - wavii-net
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ─────────────────────────────────────────
+  # Nginx — reverse proxy HTTPS
+  # ─────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: wavii-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"    # HTTP → redirige a HTTPS + ACME challenge
+      - "443:443"  # HTTPS con certificado Let's Encrypt
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - certbot_certs:/etc/letsencrypt:ro          # certificados SSL
+      - certbot_www:/var/www/certbot:ro            # webroot ACME challenge
+    depends_on:
+      - backend
+    networks:
+      - wavii-net
+
+  # ─────────────────────────────────────────
+  # Certbot — gestión de certificados TLS
+  # Let's Encrypt (CA reconocida, gratis)
+  # ─────────────────────────────────────────
+  certbot:
+    image: certbot/certbot:latest
+    container_name: wavii-certbot
+    volumes:
+      - certbot_certs:/etc/letsencrypt   # donde guarda los certificados
+      - certbot_www:/var/www/certbot     # webroot para el challenge HTTP-01
+    # Cada 12 h comprueba si los certificados necesitan renovarse (expiran a 90 días)
+    entrypoint: >
+      /bin/sh -c "trap exit TERM;
+      while :; do
+        certbot renew --webroot -w /var/www/certbot --quiet;
+        sleep 12h & wait $${!};
+      done"
+
+  # ─────────────────────────────────────────
+  # Odoo 17 — ERP / Facturación
+  # ─────────────────────────────────────────
+  odoo:
+    image: odoo:17
+    container_name: wavii-odoo
+    restart: unless-stopped
+    ports:
+      - "8069:8069"
+    environment:
+      HOST: postgres
+      USER: ${POSTGRES_USER:-wavii}
+      PASSWORD: ${POSTGRES_PASSWORD:-wavii_dev}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - odoo_data:/var/lib/odoo
+      - ./odoo/odoo.conf:/etc/odoo/odoo.conf:ro
+    networks:
+      - wavii-net
+
+  # NOTA: El frontend (Expo) NO se ejecuta en Docker.
+  # React Native necesita acceso directo a la red del PC para
+  # que el móvil pueda conectarse al Metro bundler.
+  # Arrancar el frontend desde la carpeta wavii/frontend/:
+  #   npm install
+  #   npx expo start
+
+# ─────────────────────────────────────────
+# Volúmenes persistentes
+# ─────────────────────────────────────────
+volumes:
+  postgres_data:
+    name: wavii_postgres_data
+  mongo_data:
+    name: wavii_mongo_data
+  odoo_data:
+    name: wavii_odoo_data
+  certbot_certs:
+    name: wavii_certbot_certs   # certificados Let's Encrypt (persisten entre reinicios)
+  certbot_www:
+    name: wavii_certbot_www     # webroot temporal para challenge ACME
+
+# ─────────────────────────────────────────
+# Red interna
+# ─────────────────────────────────────────
+networks:
+  wavii-net:
+    name: wavii-network
+    driver: bridge

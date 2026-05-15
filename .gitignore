@@ -1,0 +1,41 @@
+# ── Node / Expo ──
+frontend/node_modules/
+frontend/.expo/
+frontend/dist/
+frontend/web-build/
+
+# ── Android / iOS builds ──
+frontend/android/
+frontend/ios/
+
+# ── Java / Spring Boot ──
+backend/target/
+backend/.gradle/
+backend/build/
+backend/**/*.class
+
+# ── Admin ──
+admin/node_modules/
+admin/dist/
+admin/.next/
+
+# ── Docker ──
+
+# ── IDEs ──
+.idea/
+.vscode/
+*.iml
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── Entornos ──
+#.env
+#.env.local
+#.env.production
+#*.env
+
+# ── Logs ──
+*.log
+npm-debug.log*

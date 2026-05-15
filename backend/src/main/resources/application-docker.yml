@@ -1,0 +1,74 @@
+# Perfil activo cuando SPRING_PROFILES_ACTIVE=docker
+# Se carga encima de application.yml (override)
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:wavii}
+    username: ${DB_USER:wavii}
+    password: ${DB_PASSWORD:wavii_dev}
+
+  data:
+    mongodb:
+      uri: mongodb://${MONGO_USER:wavii}:${MONGO_PASSWORD:wavii_dev}@${MONGO_HOST:mongodb}:${MONGO_PORT:27017}/${MONGO_DB:wavii_docs}?authSource=admin
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+wavii:
+  jwt:
+    secret: ${JWT_SECRET:dev_secret_wavii_shared_default_2026_x}
+  app:
+    base-url: ${APP_BASE_URL:http://localhost:8080}
+
+twilio:
+  account-sid: ${TWILIO_ACCOUNT_SID:}
+  auth-token: ${TWILIO_AUTH_TOKEN:}
+  from-number: ${TWILIO_FROM_NUMBER:}
+
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY:}
+  price-plus: ${STRIPE_PRICE_PLUS:}
+  price-scholar: ${STRIPE_PRICE_SCHOLAR:}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+  coupon-scholar-promo: ${STRIPE_COUPON_SCHOLAR_PROMO:${STRIPE_COUPON_PLUS_PROMO:}}
+
+odoo:
+  url: ${ODOO_URL:http://odoo:8069}
+  db: ${ODOO_DB:wavii_odoo}
+  user: ${ODOO_USER:admin}
+  password: ${ODOO_PASSWORD:wavii_admin_2026}
+  webhook-secret: ${ODOO_WEBHOOK_SECRET:}
+
+# Actuator para healthcheck de Docker
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    com.wavii: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
